@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import { ActionButton, useAction } from "@/components/action-client";
 import { SpecialistButton } from "@/components/specialist-button";
+import { NextActionCard } from "@/components/next-action";
 import { Badge, Note, Panel, StatusBadge } from "@/components/ui";
-import { activeSteps, IMPLEMENTATION_TREATMENTS, type Blueprint, type DesignCompletion, type StepDiff, type WorkflowStep } from "@/lib/factory/blueprint";
-import type { ValueNorthStar } from "@/lib/factory/schema";
+import { activeSteps, BASIS_VALUES, humanDecisionCovered, IMPLEMENTATION_TREATMENTS, personOwned, type Blueprint, type DesignCompletion, type StepDiff, type WorkflowStep } from "@/lib/factory/blueprint";
+import type { NextHumanAction, ValueNorthStar } from "@/lib/factory/schema";
 
 type Tab = "business" | "rules" | "checks" | "actions" | "currentAi" | "technical" | "notes";
 
-export function BlueprintCanvas(props: { blueprint: Blueprint; stage: string; stateRevision: number; designCompletion: DesignCompletion; technical: { ready: boolean; reasons: string[] }; commandCenter: { ready: boolean; reasons: string[] }; diff: StepDiff[]; hasSnapshot: boolean; snapshotVersion?: string; underReview: boolean; valueNorthStar: ValueNorthStar; evidence: { evidenceRef: string; title: string }[] }) {
-  const { blueprint: bp, designCompletion: dc, underReview } = props;
+export function BlueprintCanvas(props: { blueprint: Blueprint; stage: string; stateRevision: number; designCompletion: DesignCompletion; technical: { ready: boolean; reasons: string[] }; commandCenter: { ready: boolean; reasons: string[] }; diff: StepDiff[]; hasSnapshot: boolean; snapshotVersion?: string; underReview: boolean; nextAction: NextHumanAction; stageLabel: string; gatingKeys: string[]; enterpriseStatus: string; valueNorthStar: ValueNorthStar; evidence: { evidenceRef: string; title: string }[] }) {
+  const { blueprint: bp, designCompletion: dc, underReview, gatingKeys } = props;
   const steps = useMemo(() => activeSteps(bp), [bp]);
   const [selectedId, setSelectedId] = useState<string>(steps[0]?.contractId ?? "");
   const [tab, setTab] = useState<Tab>("business");
@@ -19,6 +20,11 @@ export function BlueprintCanvas(props: { blueprint: Blueprint; stage: string; st
   const selected = steps.find((s) => s.contractId === selectedId) ?? steps[0];
   const diffFor = (id: string) => props.diff.find((d) => d.contractId === id);
   const pct = Math.round((dc.areas.reduce((s, a) => s + (a.total ? a.done / a.total : 1), 0) / dc.areas.length) * 100);
+  const gating = dc.areas.filter((a) => gatingKeys.includes(a.key));
+  const gatingDone = gating.every((a) => a.complete);
+  const confirmedSteps = steps.filter((s) => s.status === "confirmed").length;
+  const citedRules = steps.flatMap((s) => s.rules).filter((r) => r.provenance.sourceRef.trim()).length;
+  const stageName = props.stage === "BASELINE_DESIGN" ? "Baseline design" : props.stage === "TARGET_DESIGN" ? "Target design" : props.stage.replaceAll("_", " ").toLowerCase();
   return (
     <>
       <div className="row spread">
@@ -45,16 +51,28 @@ export function BlueprintCanvas(props: { blueprint: Blueprint; stage: string; st
           ) : null}
         </div>
       </div>
+      <div className="section">
+        <NextActionCard action={props.nextAction} stageLabel={props.stageLabel} compact />
+      </div>
       {underReview ? <div className="section"><Note tone="warn">The design is under protected review (snapshot v{props.snapshotVersion}). Editing is locked until a reviewer requests changes.</Note></div> : null}
+      {props.enterpriseStatus !== "CONFIRMED" ? <div className="section"><Note tone="warn">Enterprise context is {props.enterpriseStatus.toLowerCase()}: systems, integrations and data owners named here are not yet grounded against a confirmed client landscape.</Note></div> : null}
 
       <div className="grid section" style={{ gridTemplateColumns: "minmax(0, 1fr) 340px" }}>
         <div className="stack">
           {/* Design completion */}
-          <Panel label="Design completion gates" right={<Badge tone={dc.complete ? "green" : "amber"}>{dc.complete ? "COMPLETE" : `${pct}%`}</Badge>}>
-            <div className="grid grid-4" style={{ gap: 8 }}>
-              {dc.areas.map((a) => (
-                <div key={a.key} className="card" style={{ padding: 8 }}>
-                  <div className="label">{a.label}</div>
+          <Panel label="Design completion" right={<Badge tone={dc.complete ? "green" : "amber"}>{dc.complete ? "COMPLETE" : `${pct}% overall`}</Badge>}>
+            {gating.length ? (
+              <Note tone={gatingDone ? "" : "warn"}>
+                <b>What gates {stageName}:</b> {gating.map((a) => `${a.label} (${a.done}/${a.total})`).join(", ")}.{" "}
+                {gatingDone ? (props.stage === "BASELINE_DESIGN" ? "Done. Submit for review whenever you are ready; the other areas below are target-design work and do not block the baseline." : "Done. Submit for review whenever you are ready.") : props.stage === "BASELINE_DESIGN" ? "The other areas below are completed in target design and feed the Technical Spec handoff; they do not block the baseline." : "Everything below must be complete before target design can be submitted."}
+              </Note>
+            ) : (
+              <Note>No design-completion area gates the current stage. The panel shows readiness for the Technical Spec handoff.</Note>
+            )}
+            <div className="grid grid-4" style={{ gap: 8, marginTop: 8 }}>
+              {[...dc.areas].sort((a, b) => Number(gatingKeys.includes(b.key)) - Number(gatingKeys.includes(a.key))).map((a) => (
+                <div key={a.key} className={`card${gatingKeys.includes(a.key) ? " gates" : ""}`} style={{ padding: 8 }}>
+                  <div className="label">{a.label}{gatingKeys.includes(a.key) ? <> · <span className="gate-tag">gates stage</span></> : null}</div>
                   <div className="row spread">
                     <b>
                       {a.done}/{a.total}
@@ -126,6 +144,9 @@ export function BlueprintCanvas(props: { blueprint: Blueprint; stage: string; st
                           <div className="title">{s.name}</div>
                           <div className="meta">
                             {s.owner} · {s.type} · {s.rules.length} rules · {s.checks.length} checks · {s.humanActions.length} actions
+                          </div>
+                          <div className="meta">
+                            <BasisBadge basis={s.basis} /> {s.lane ? <Badge>{s.lane}</Badge> : null} {!humanDecisionCovered(s) ? <Badge tone="amber">no human decision</Badge> : null}
                           </div>
                           <div className="meta">
                             <StatusBadge value={s.implementation.targetState.treatment} /> {s.authority.autonomyLevel !== "TBD" ? <Badge tone="accent">{s.authority.autonomyLevel}</Badge> : <Badge tone="amber">authority TBD</Badge>}
@@ -235,8 +256,28 @@ export function BlueprintCanvas(props: { blueprint: Blueprint; stage: string; st
         <div className="stack">
           <ValueNorthStarPanel v={props.valueNorthStar} locked={underReview} />
           {selected ? <Inspector step={selected} steps={steps} tab={tab} setTab={setTab} locked={underReview} evidence={props.evidence} /> : null}
-          <Panel label="AI specialist">
-            <SpecialistButton specialistId="BLUEPRINT" label={bp.mode === "TARGET" ? "Propose target redesign" : "Re-derive from evidence"} />
+          <Panel label="AI specialist · Blueprint tasks">
+            <div className="stack" style={{ gap: 10 }}>
+              <div>
+                <div className="small"><b>Enrich confirmed steps</b> · {confirmedSteps} of {steps.length} confirmed</div>
+                <div className="small muted" style={{ marginBottom: 4 }}>Drafts rules, checks and human actions only for steps whose structure you confirmed. Unreviewed items on those steps are replaced; confirmed items are kept.</div>
+                {confirmedSteps ? <SpecialistButton specialistId="BLUEPRINT" task="ENRICH" label="Enrich confirmed steps" /> : <span className="small muted">Confirm at least one step first.</span>}
+              </div>
+              <div>
+                <div className="small"><b>Verify rule citations</b> · {citedRules} rule(s) cite evidence</div>
+                <div className="small muted" style={{ marginBottom: 4 }}>Reads each cited record and marks rules it does not support as DISPUTED.</div>
+                {citedRules ? <SpecialistButton specialistId="BLUEPRINT" task="CITATION_CHECK" label="Check citations against evidence" /> : <span className="small muted">Link evidence to rules first.</span>}
+              </div>
+              <div>
+                <div className="small"><b>Re-draft structure</b></div>
+                <div className="small muted" style={{ marginBottom: 4 }}>Replaces the skeleton from evidence; accepted steps arrive OPEN again.</div>
+                <SpecialistButton specialistId="BLUEPRINT" task="STRUCTURE" label={bp.mode === "TARGET" ? "Propose target structure" : "Re-derive structure from evidence"} />
+              </div>
+              <div>
+                <div className="small muted">One-pass alternative (structure and detail together):</div>
+                <SpecialistButton specialistId="BLUEPRINT" label={bp.mode === "TARGET" ? "Propose full target redesign" : "Re-derive full blueprint"} />
+              </div>
+            </div>
           </Panel>
         </div>
       </div>
@@ -352,13 +393,20 @@ function Inspector({ step: s, steps, tab, setTab, locked, evidence }: { step: Wo
               <div className="row spread">
                 <b style={{ fontSize: 12 }}>{r.ruleId}</b>
                 <span>
-                  {r.hardStop ? <Badge tone="red">HARD STOP</Badge> : null} <Badge>{r.ruleType}</Badge> <StatusBadge value={r.provenance.status} />
+                  {r.hardStop ? <Badge tone="red">HARD STOP</Badge> : null} <Badge>{r.ruleType}</Badge> <BasisBadge basis={r.basis} /> <StatusBadge value={r.provenance.status} />
                 </span>
               </div>
               <div className="small">{r.statement}</div>
               <div className="small muted">
                 Provenance: {r.provenance.sourceType} {r.provenance.sourceRef}
               </div>
+              {r.provenance.verification ? (
+                <div className="small" style={{ marginTop: 4, borderLeft: "3px solid var(--line)", paddingLeft: 8 }}>
+                  <StatusBadge value={r.provenance.verification.verdict} /> <span className="muted">citation check</span>
+                  {r.provenance.verification.quote ? <div className="muted">&ldquo;{r.provenance.verification.quote}&rdquo;</div> : null}
+                  {r.provenance.verification.note ? <div className="muted">{r.provenance.verification.note}</div> : null}
+                </div>
+              ) : null}
               {!locked ? (
                 <div className="row" style={{ marginTop: 6 }}>
                   <select
@@ -379,6 +427,18 @@ function Inspector({ step: s, steps, tab, setTab, locked, evidence }: { step: Wo
                   <ActionButton actionType="UPDATE_BLUEPRINT" payload={{ op: "SET_RULE", stepId: sid, ruleId: r.ruleId, fields: { hardStop: !r.hardStop } }}>
                     {r.hardStop ? "Unset hard stop" : "Set hard stop"}
                   </ActionButton>
+                  <select
+                    defaultValue={r.basis ?? "INFERRED"}
+                    onChange={(e) => run("UPDATE_BLUEPRINT", { op: "SET_RULE", stepId: sid, ruleId: r.ruleId, fields: { basis: e.target.value } })}
+                    style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 4, fontSize: 11 }}
+                    title="Basis: documented in a policy or SOP, observed in practice, or inferred"
+                  >
+                    {BASIS_VALUES.map((b) => (
+                      <option key={b} value={b}>
+                        basis: {b.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ) : null}
             </div>
@@ -438,6 +498,7 @@ function Inspector({ step: s, steps, tab, setTab, locked, evidence }: { step: Wo
 
       {tab === "actions" ? (
         <div className="stack" style={{ gap: 8 }}>
+          {personOwned(s) ? <HumanDecisionCoverage step={s} locked={locked} /> : <div className="small muted">Owned by a system or AI ({s.type}); no human decision is expected here unless you add one.</div>}
           {s.humanActions.map((a) => (
             <div key={a.actionId} className="card" style={{ padding: 8 }}>
               <div className="row spread">
@@ -499,7 +560,7 @@ function Inspector({ step: s, steps, tab, setTab, locked, evidence }: { step: Wo
 }
 
 function EditableFields({ step: s, locked }: { step: WorkflowStep; locked: boolean }) {
-  const [f, setF] = useState({ name: s.name, owner: s.owner, type: s.type, purpose: s.purpose, trigger: s.trigger, aiRole: s.aiRole, humanAuthority: s.humanAuthority, outcome: s.outcome, exceptions: s.exceptions, rerun: s.rerun, writeback: s.writeback, systems: s.systems.join(", "), reads: s.reads.join(", "), writes: s.writes.join(", ") });
+  const [f, setF] = useState({ name: s.name, owner: s.owner, type: s.type, basis: s.basis ?? "INFERRED", purpose: s.purpose, trigger: s.trigger, aiRole: s.aiRole, humanAuthority: s.humanAuthority, outcome: s.outcome, exceptions: s.exceptions, rerun: s.rerun, writeback: s.writeback, systems: s.systems.join(", "), reads: s.reads.join(", "), writes: s.writes.join(", ") });
   const [dirty, setDirty] = useState(false);
   const set = (k: keyof typeof f, v: string) => {
     setF({ ...f, [k]: v });
@@ -537,6 +598,16 @@ function EditableFields({ step: s, locked }: { step: WorkflowStep; locked: boole
           ))}
         </select>
       </div>
+      <div className="field">
+        <label>Basis</label>
+        <select disabled={locked} value={f.basis} onChange={(e) => set("basis", e.target.value)}>
+          {BASIS_VALUES.map((b) => (
+            <option key={b} value={b}>
+              {b === "DOCUMENTED" ? "Documented (policy, SOP or system config states it)" : b === "OBSERVED" ? "Observed (seen in data, emails or interviews)" : "Inferred (reasoning; no evidence states it)"}
+            </option>
+          ))}
+        </select>
+      </div>
       {!locked ? (
         <ActionButton actionType="UPDATE_BLUEPRINT" variant="secondary" disabled={!dirty} payload={{ op: "SET_STEP", stepId: s.contractId, fields: { ...f, systems: split(f.systems), reads: split(f.reads), writes: split(f.writes) } }} onDone={(r) => r.ok && setDirty(false)}>
           Save step (re-opens review of dependents)
@@ -549,6 +620,7 @@ function EditableFields({ step: s, locked }: { step: WorkflowStep; locked: boole
 function AddRule({ stepId }: { stepId: string }) {
   const [st, setSt] = useState("");
   const [type, setType] = useState("Business Policy");
+  const [basis, setBasis] = useState("OBSERVED");
   const [hard, setHard] = useState(false);
   return (
     <div className="card" style={{ padding: 8 }}>
@@ -560,10 +632,17 @@ function AddRule({ stepId }: { stepId: string }) {
               <option key={t}>{t}</option>
             ))}
           </select>
+          <select value={basis} onChange={(e) => setBasis(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 4 }} title="Basis">
+            {BASIS_VALUES.map((b) => (
+              <option key={b} value={b}>
+                basis: {b.toLowerCase()}
+              </option>
+            ))}
+          </select>
           <label className="small row">
             <input type="checkbox" checked={hard} onChange={(e) => setHard(e.target.checked)} /> hard stop
           </label>
-          <ActionButton actionType="UPDATE_BLUEPRINT" disabled={!st.trim()} payload={{ op: "ADD_RULE", stepId, rule: { statement: st, ruleType: type, hardStop: hard } }} onDone={(r) => r.ok && setSt("")}>
+          <ActionButton actionType="UPDATE_BLUEPRINT" disabled={!st.trim()} payload={{ op: "ADD_RULE", stepId, rule: { statement: st, ruleType: type, hardStop: hard, basis } }} onDone={(r) => r.ok && setSt("")}>
             Add rule
           </ActionButton>
         </div>
@@ -737,6 +816,43 @@ function TechnicalEditor({ step: s, locked }: { step: WorkflowStep; locked: bool
         </ActionButton>
       ) : null}
       <p className="small muted">Logical capability never implies a new deployable service. KEEP / REUSE components are preserved unless authoritative design changes the treatment.</p>
+    </div>
+  );
+}
+
+function BasisBadge({ basis }: { basis?: string }) {
+  const b = basis ?? "UNSTATED";
+  const tone = b === "DOCUMENTED" ? "green" : b === "OBSERVED" ? "blue" : b === "INFERRED" ? "amber" : "";
+  return <Badge tone={tone}>{b.toLowerCase()}</Badge>;
+}
+
+/** Person-owned steps must carry a human action or say explicitly that nobody decides there. */
+function HumanDecisionCoverage({ step: s, locked }: { step: WorkflowStep; locked: boolean }) {
+  const [reason, setReason] = useState(s.noHumanDecisionReason ?? "");
+  const covered = humanDecisionCovered(s);
+  if (s.humanActions.length) return <div className="small muted">Owner is a person ({s.owner}); {s.humanActions.length} human action(s) recorded.</div>;
+  return (
+    <div className="card" style={{ padding: 8, borderColor: covered ? undefined : "var(--amber)" }}>
+      <div className="small">
+        <b>{s.owner}</b> owns this step but no human action is recorded.{" "}
+        {s.noHumanDecision ? <>Marked <b>no human decision</b>: {s.noHumanDecisionReason}</> : "Add the decision they take here, or state that nobody decides at this step."}
+      </div>
+      {!locked ? (
+        <div className="row" style={{ marginTop: 6 }}>
+          {s.noHumanDecision ? (
+            <ActionButton actionType="UPDATE_BLUEPRINT" payload={{ op: "SET_HUMAN_DECISION", stepId: s.contractId, noHumanDecision: false }}>
+              A human does decide here
+            </ActionButton>
+          ) : (
+            <>
+              <input placeholder="Why nobody decides at this step" value={reason} onChange={(e) => setReason(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 6, flex: 1 }} />
+              <ActionButton actionType="UPDATE_BLUEPRINT" disabled={!reason.trim()} payload={{ op: "SET_HUMAN_DECISION", stepId: s.contractId, noHumanDecision: true, reason }}>
+                No human decision here
+              </ActionButton>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

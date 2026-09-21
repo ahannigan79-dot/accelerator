@@ -31,12 +31,32 @@ export type ImplementationTreatment = (typeof IMPLEMENTATION_TREATMENTS)[number]
 export type RuleType = "Business Policy" | "Deterministic" | "Regulatory" | "Human Authority" | "Data Quality";
 export type RuleProvenanceStatus = "UNCONFIRMED" | "CLIENT_CONFIRMED" | "SOURCE_SUPPORTED" | "VERIFIED" | "DISPUTED";
 
+/**
+ * Where a rule or step comes from. DOCUMENTED: written in a policy, SOP or system configuration.
+ * OBSERVED: practice seen in transaction data, emails or interviews but not written down as a rule.
+ * INFERRED: the author's reasoning; no evidence states it directly.
+ */
+export const BASIS_VALUES = ["DOCUMENTED", "OBSERVED", "INFERRED"] as const;
+export type Basis = (typeof BASIS_VALUES)[number];
+
+export type CitationVerdict = "SUPPORTED" | "PARTIAL" | "NOT_SUPPORTED" | "SOURCE_MISSING";
+
+export interface RuleVerification {
+  verdict: CitationVerdict;
+  /** Short quote from the cited evidence that supports or contradicts the rule, if any. */
+  quote: string;
+  note: string;
+  at: string;
+  recommendationRef: string;
+}
+
 export interface Rule {
   ruleId: string; // WF-003-R01
   statement: string;
   ruleType: RuleType;
   hardStop: boolean;
-  provenance: { sourceType: string; sourceRef: string; status: RuleProvenanceStatus };
+  basis: Basis;
+  provenance: { sourceType: string; sourceRef: string; status: RuleProvenanceStatus; verification?: RuleVerification };
 }
 
 export type LogicType = "Deterministic" | "AI-assisted" | "Human judgment" | "Hybrid";
@@ -140,6 +160,10 @@ export interface WorkflowStep {
   outcome: string;
   writeback: string;
   notes: string;
+  basis: Basis;
+  /** Explicit statement that nobody decides anything at this step (only meaningful for human/mixed steps). */
+  noHumanDecision: boolean;
+  noHumanDecisionReason: string;
   status: ReviewStatus;
   archived: boolean;
   origin: "BASELINE" | "ADDED" | "REIMAGINED";
@@ -307,6 +331,22 @@ export function arbAssessmentResolved(step: WorkflowStep): boolean {
   return ["NONE", "REQUIRED"].includes(step.implementation.arbImpact.reviewRequired);
 }
 
+/** A step where a person owns the work: human or mixed type. Such steps must either carry a human action or say explicitly that nobody decides there. */
+export function personOwned(step: WorkflowStep): boolean {
+  return step.type === "human" || step.type === "mixed";
+}
+
+export function humanDecisionCovered(step: WorkflowStep): boolean {
+  if (!personOwned(step)) return true;
+  if (step.humanActions.length > 0) return true;
+  return step.noHumanDecision === true && String(step.noHumanDecisionReason ?? "").trim().length > 0;
+}
+
+/** Person-owned steps that neither carry a human action nor an explicit "no human decision" statement. */
+export function uncoveredHumanDecisionSteps(bp: Blueprint): WorkflowStep[] {
+  return activeSteps(bp).filter((s) => !humanDecisionCovered(s));
+}
+
 export function treatmentClassified(step: WorkflowStep): boolean {
   return step.implementation.targetState.treatment !== "TO_CONFIRM";
 }
@@ -329,6 +369,8 @@ export function checkInvariantViolations(bp: Blueprint): string[] {
   return out;
 }
 
+export const DESIGN_AREA_KEYS = ["structure", "checks", "actions", "humanDecision", "currentAi", "asBuilt", "value", "authority", "provenance", "arb", "treatment"] as const;
+
 export interface DesignCompletion {
   areas: { key: string; label: string; done: number; total: number; complete: boolean }[];
   openAreas: string[];
@@ -345,6 +387,7 @@ export function designCompletionSummary(bp: Blueprint): DesignCompletion {
     { key: "structure", label: "Workflow structure", done: steps.filter((s) => s.status === "confirmed").length, total: steps.length },
     { key: "checks", label: "Checks and correlated outputs", done: checks.filter((c) => c.reviewStatus === "confirmed").length, total: checks.length },
     { key: "actions", label: "Human actions", done: actions.filter((a) => a.reviewStatus === "confirmed").length, total: actions.length },
+    { key: "humanDecision", label: "Human decision coverage", done: steps.filter(personOwned).filter(humanDecisionCovered).length, total: steps.filter(personOwned).length },
     { key: "currentAi", label: "Current AI inventory", done: bp.currentAi.filter((i) => i.reviewStatus === "confirmed").length, total: bp.currentAi.length },
     { key: "asBuilt", label: "As-built assessment", done: steps.filter((s) => s.implementation.currentState.assessmentStatus !== "UNASSESSED").length, total: steps.length },
     { key: "value", label: "Value North Star", done: valueMetricReady(bp.valueNorthStar) ? 1 : 0, total: 1 },
@@ -356,6 +399,17 @@ export function designCompletionSummary(bp: Blueprint): DesignCompletion {
   const invariantViolations = checkInvariantViolations(bp);
   const openAreas = areas.filter((a) => !a.complete).map((a) => a.label);
   return { areas, openAreas, complete: openAreas.length === 0 && invariantViolations.length === 0, invariantViolations };
+}
+
+/**
+ * Which design-completion areas gate the current lifecycle stage. Baseline design only needs the
+ * workflow structure confirmed before submission; the remaining areas are target-design work that
+ * feeds the Technical Spec handoff. Anywhere else nothing on this page gates the stage.
+ */
+export function stageGatingAreas(stage: string): string[] {
+  if (stage === "BASELINE_DESIGN") return ["structure"];
+  if (stage === "TARGET_DESIGN") return [...DESIGN_AREA_KEYS];
+  return [];
 }
 
 /** Readiness to hand the design to the Technical Compiler. */
@@ -487,6 +541,9 @@ export function buildDesignContract(bp: Blueprint, stateRevision: number) {
       exceptions: s.exceptions,
       rerun: s.rerun,
       outcome: s.outcome,
+      basis: s.basis,
+      noHumanDecision: s.noHumanDecision,
+      noHumanDecisionReason: s.noHumanDecisionReason,
       rules: s.rules,
       checks: s.checks,
       humanActions: s.humanActions,

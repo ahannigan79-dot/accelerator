@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { NextActionCard } from "@/components/next-action";
 import { Badge, KV, Note, Panel, Stat, StatusBadge, fmtDate } from "@/components/ui";
 import { valueMetricReady } from "@/lib/factory/blueprint";
+import { enterpriseEntryCount, getEnterpriseContext } from "@/lib/factory/content";
 import { STAGE_LABELS } from "@/lib/factory/lifecycle";
 import { getStore } from "@/lib/factory/store";
 import { OverviewActions } from "./overview-actions";
@@ -30,7 +31,8 @@ export default async function Workspace({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <div className="grid grid-4 section">
+      <div className="grid grid-5 section">
+        <Stat label="Enterprise context" value={<span style={{ fontSize: 15 }}>{enterpriseEntryCount(getEnterpriseContext(state))} entries</span>} sub={<><StatusBadge value={getEnterpriseContext(state).reviewStatus} /> <Link href={`${base}/enterprise`} className="small">Open</Link></>} tone={getEnterpriseContext(state).reviewStatus === "CONFIRMED" ? "green" : "amber"} />
         <Stat label="Value North Star" value={<span style={{ fontSize: 15 }}>{state.valueNorthStar.primaryMetric}</span>} sub={<StatusBadge value={valueMetricReady(state.valueNorthStar) ? "CONFIRMED" : state.valueNorthStar.reviewStatus} />} />
         <Stat label="Open decisions" value={pending.length} sub="Pending human decisions" tone={pending.length ? "amber" : ""} />
         <Stat label="Blocking evidence open" value={er.blockingOpen} sub={`${er.sufficient} sufficient · ${er.partial} partial · ${er.required} required · ${er.toConfirm} to confirm`} tone={er.blockingOpen ? "amber" : "green"} />

@@ -2,6 +2,7 @@
  * Factory State construction and the default evidence-requirement profile.
  */
 
+import { emptyEnterpriseContext } from "./content";
 import { assessAllRequirements, assessDiscoverySufficiency } from "./evidence";
 import { nowIso, slugify } from "./ids";
 import {
@@ -153,6 +154,7 @@ export function createEngagementState(input: CreateEngagementInput, at = nowIso(
     lifecycleEvidence: { DISCOVERY: { enteredAt: at, enteredAtRevision: 0 } },
     engagementSetup: setup,
     valueNorthStar: emptyValueNorthStar(),
+    enterpriseContext: emptyEnterpriseContext(at),
     jobs: [],
     checkpoints: [],
     counters: { TC: setup.clientObjective === "TO_CONFIRM" ? 1 : 0 },

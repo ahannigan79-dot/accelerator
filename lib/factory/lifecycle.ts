@@ -2,8 +2,8 @@
  * Lifecycle router: stage order, advance preconditions and the single dominant next human action.
  */
 
-import { designCompletionSummary } from "./blueprint";
-import { getBlueprint, getBuildContract, getIntegrationContract, getRealizationPlan, getTechnicalDesign, getTransformationPlan, getValidationReport } from "./content";
+import { activeSteps, designCompletionSummary } from "./blueprint";
+import { enterpriseEntryCount, getBlueprint, getBuildContract, getEnterpriseContext, getIntegrationContract, getRealizationPlan, getTechnicalDesign, getTransformationPlan, getValidationReport } from "./content";
 import { GATE_APPROVER_ROLES } from "./decisions";
 import { STAGE_EXIT_GATE } from "./gates";
 import { LIFECYCLE_STAGES, type FactoryState, type GateId, type LifecycleStage, type NextHumanAction } from "./schema";
@@ -69,6 +69,7 @@ export function canAdvance(state: FactoryState): AdvanceCheck {
     case "DISCOVERY": {
       if (state.discoverySufficiency.layers.BUSINESS.status === "REQUIRED") reasons.push("Business discovery evidence is REQUIRED before baseline design can start");
       if (!state.evidenceCatalog.some((e) => e.authorityStatus === "CURRENT")) reasons.push("No current evidence recorded");
+      if (getEnterpriseContext(state).reviewStatus !== "CONFIRMED") reasons.push("Enterprise context (standards, systems, integrations, data) not confirmed; workflows are designed on top of it");
       break;
     }
     case "BASELINE_DESIGN": {
@@ -136,6 +137,11 @@ export function deriveNextAction(state: FactoryState): NextHumanAction {
       if (!state.evidenceCatalog.length) return { title: "Upload initial evidence", detail: "Any existing material — process documents, policies, interview notes, system exports. Unknowns stay TO_CONFIRM.", actionType: "UPLOAD_EVIDENCE", allowedRoles: [...CONSULTANT_ROLES], route: `${base}/evidence` };
       const openC = state.discoverySufficiency.contradictions.filter((c) => c.status === "OPEN");
       if (openC.length) return { title: "Resolve evidence contradiction", detail: openC[0].description, actionType: "RESOLVE_CONTRADICTION", target: { type: "CONTRADICTION", id: openC[0].contradictionId }, allowedRoles: ["CONSULTANT", "DELIVERY_LEAD", "CLIENT_BUSINESS_OWNER", "CLIENT_PROCESS_OWNER"], route: `${base}/evidence` };
+      const ec = getEnterpriseContext(state);
+      const evidenceGap = adv.reasons.find((r) => !/Enterprise context/.test(r));
+      if (evidenceGap) return { title: "Close the business discovery gap", detail: evidenceGap, actionType: "UPLOAD_EVIDENCE", allowedRoles: [...CONSULTANT_ROLES], route: `${base}/evidence` };
+      if (enterpriseEntryCount(ec) === 0) return { title: "Ground the enterprise context", detail: "Establish the client's standards, systems, integration patterns, data domains and constraints from evidence before designing any workflow on top of them.", actionType: "RUN_SPECIALIST", target: { type: "ARTIFACT", id: "enterprise-context" }, allowedRoles: [...CONSULTANT_ROLES], route: `${base}/enterprise` };
+      if (ec.reviewStatus !== "CONFIRMED") return { title: "Confirm the enterprise context", detail: `${enterpriseEntryCount(ec)} entries drafted, ${ec.gaps.length} gap(s) listed. The client architect confirms this as the ground truth workflow design builds on.`, actionType: "SET_ENTERPRISE_CONTEXT", target: { type: "ARTIFACT", id: "enterprise-context" }, allowedRoles: ["CLIENT_ARCHITECT", "CLIENT_IT_OPERATIONS", "SECURITY_PRIVACY", "DELIVERY_LEAD"], route: `${base}/enterprise` };
       if (!adv.ok) return { title: "Close the business discovery gap", detail: adv.reasons[0], actionType: "UPLOAD_EVIDENCE", allowedRoles: [...CONSULTANT_ROLES], route: `${base}/evidence` };
       return { title: "Start baseline design", detail: "Business discovery is sufficient to reconstruct the current-state workflow.", actionType: "ADVANCE_STAGE", allowedRoles: [...CONSULTANT_ROLES], route: `${base}` };
     }
@@ -146,8 +152,10 @@ export function deriveNextAction(state: FactoryState): NextHumanAction {
       const dc = designCompletionSummary(bp);
       const structure = dc.areas.find((a) => a.key === "structure")!;
       if (stage === "TARGET_DESIGN" && !dc.complete) return { title: "Complete the target design", detail: `Open: ${[...dc.openAreas, ...dc.invariantViolations].join(", ")}`, actionType: "UPDATE_BLUEPRINT", allowedRoles: [...CONSULTANT_ROLES, "CLIENT_PROCESS_OWNER"], route: `${base}/workflow` };
-      if (stage === "BASELINE_DESIGN" && !structure.complete) return { title: "Confirm baseline workflow steps", detail: `${structure.done} of ${structure.total} steps confirmed by structure review.`, actionType: "UPDATE_BLUEPRINT", allowedRoles: [...CONSULTANT_ROLES, "CLIENT_PROCESS_OWNER"], route: `${base}/workflow` };
-      if (state.activeStageExecution.status !== "REVIEW_READY") return { title: "Submit for review", detail: "Creates a protected review snapshot and opens the approval stage.", actionType: "SUBMIT_FOR_REVIEW", allowedRoles: [...CONSULTANT_ROLES], route: `${base}/workflow` };
+      if (stage === "BASELINE_DESIGN" && !structure.complete) return { title: "Confirm baseline workflow steps", detail: `${structure.done} of ${structure.total} steps confirmed by structure review. Only the structure gates this stage; rules, checks and actions can be enriched once steps are confirmed.`, actionType: "UPDATE_BLUEPRINT", allowedRoles: [...CONSULTANT_ROLES, "CLIENT_PROCESS_OWNER"], route: `${base}/workflow` };
+      const bare = activeSteps(bp).every((st) => !st.rules.length && !st.checks.length && !st.humanActions.length);
+      if (stage === "BASELINE_DESIGN" && bare && state.activeStageExecution.status !== "REVIEW_READY") return { title: "Enrich the confirmed steps, or submit for review", detail: "Structure is confirmed. Run enrichment to draft rules, checks and human actions per confirmed step, or submit the bare structure for review now.", actionType: "RUN_SPECIALIST", target: { type: "WORKFLOW", id: state.workflowId }, allowedRoles: [...CONSULTANT_ROLES], route: `${base}/workflow` };
+      if (state.activeStageExecution.status !== "REVIEW_READY") return { title: "Submit for review", detail: "Structure is confirmed. This creates a protected review snapshot and opens the approval stage; other design-completion areas are target-design work.", actionType: "SUBMIT_FOR_REVIEW", allowedRoles: [...CONSULTANT_ROLES], route: `${base}/workflow` };
       return { title: `Open ${stage === "BASELINE_DESIGN" ? "baseline" : "target design"} approval`, detail: "Review snapshot is ready.", actionType: "ADVANCE_STAGE", allowedRoles: [...CONSULTANT_ROLES], route: `${base}` };
     }
     case "EXPERIENCE": {

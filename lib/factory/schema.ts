@@ -596,6 +596,44 @@ export interface EngagementSetup {
   createdAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Enterprise Context: the client's landscape, grounded before any workflow is designed on it
+// ---------------------------------------------------------------------------
+
+export type EnterpriseEntryStatus = "DOCUMENTED" | "CLIENT_STATED" | "TO_CONFIRM";
+
+export interface EnterpriseEntry {
+  id: string; // ENT-###
+  /** Section-specific primary text (standard, system name, pattern, domain, constraint or policy). */
+  name: string;
+  detail: string;
+  /** Section-specific qualifier: scope for a standard, role for a system, platform for an integration pattern, system of record for a data domain, source for a constraint or policy. */
+  qualifier: string;
+  owner: string;
+  sensitivity?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "PERSONAL" | "TO_CONFIRM";
+  evidenceRefs: string[];
+  status: EnterpriseEntryStatus;
+}
+
+export const ENTERPRISE_SECTIONS = ["architectureStandards", "systems", "integrationPatterns", "dataDomains", "securityCompliance", "aiPolicy"] as const;
+export type EnterpriseSection = (typeof ENTERPRISE_SECTIONS)[number];
+
+export interface EnterpriseContext {
+  reviewStatus: "EMPTY" | "OPEN" | "CONFIRMED";
+  version: number;
+  updatedAt: string;
+  confirmedBy?: { actor: Actor; at: string; decisionId: string };
+  summary: string;
+  architectureStandards: EnterpriseEntry[];
+  systems: EnterpriseEntry[];
+  integrationPatterns: EnterpriseEntry[];
+  dataDomains: EnterpriseEntry[];
+  securityCompliance: EnterpriseEntry[];
+  aiPolicy: EnterpriseEntry[];
+  /** What the evidence does not tell us about the landscape. */
+  gaps: string[];
+}
+
 export interface StandardsControlProfile {
   applicableControls: { controlId: string; name: string; applicability: "APPLICABLE" | "NOT_APPLICABLE" | "TO_CONFIRM"; owner: string }[];
 }
@@ -652,6 +690,8 @@ export interface FactoryState {
   lifecycleEvidence: Partial<Record<LifecycleStage, { enteredAt: string; enteredAtRevision: number; byDecisionId?: string }>>;
   engagementSetup: EngagementSetup;
   valueNorthStar: ValueNorthStar;
+  /** Client landscape grounded before workflow design. Older records may lack it; read through getEnterpriseContext(). */
+  enterpriseContext?: EnterpriseContext;
   jobs: Job[];
   checkpoints: { checkpointId: string; at: string; stateRevision: number; note: string }[];
   /** Monotonic counters for stable IDs. */

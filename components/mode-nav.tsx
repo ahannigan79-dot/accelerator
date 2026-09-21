@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const MODES: [string, string][] = [
   ["", "Overview"],
+  ["/enterprise", "Enterprise"],
   ["/workflow", "Workflow"],
   ["/evidence", "Evidence"],
   ["/decisions", "Decisions"],

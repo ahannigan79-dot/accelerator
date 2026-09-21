@@ -14,9 +14,9 @@
  * Persistence is the caller's job (see service.ts) so this module stays pure.
  */
 
-import { activeSteps, defaultAuthority, defaultImplementation, designCompletionSummary, invalidateDependents, stepId as mkStepId, type Blueprint, type Check, type HumanAction, type Rule, type WorkflowStep, type WorkflowStepInput } from "./blueprint";
+import { activeSteps, BASIS_VALUES, nextRuleId, defaultAuthority, defaultImplementation, designCompletionSummary, invalidateDependents, stepId as mkStepId, type Blueprint, type Check, type CitationVerdict, type HumanAction, type Rule, type WorkflowStep, type WorkflowStepInput } from "./blueprint";
 import { generateBuildContract, type RepositoryRealizationPlan } from "./build";
-import { CONTENT_KEYS, getBlueprint, getBuildContract, getIntegrationContract, getSimulationPacks, getTechnicalDesign } from "./content";
+import { CONTENT_KEYS, enterpriseEntryCount, getBlueprint, getBuildContract, getEnterpriseContext, getIntegrationContract, getSimulationPacks, getTechnicalDesign } from "./content";
 import { actorMayDecide, GATE_APPROVER_ROLES, recordDecision } from "./decisions";
 import { assessAllRequirements, assessDiscoverySufficiency, detectContradictions } from "./evidence";
 import { evaluateAllGates, STAGE_EXIT_GATE } from "./gates";
@@ -29,9 +29,12 @@ import { projectRuntime, isRuntimeStale } from "./projection";
 import { bumpMinor, bumpVersion, currentArtifact, registerArtifact } from "./artifacts";
 import {
   DECISION_TYPES,
+  ENTERPRISE_SECTIONS,
   GATE_IDS,
   TARGET_DESIGN_MODES,
   type Actor,
+  type EnterpriseContext,
+  type EnterpriseEntry,
   type ActorRole,
   type DecisionType,
   type EventType,
@@ -63,6 +66,7 @@ export const ACTION_TYPES = [
   "SUBMIT_FOR_REVIEW",
   "UPDATE_BLUEPRINT",
   "SET_VALUE_NORTH_STAR",
+  "SET_ENTERPRISE_CONTEXT",
   "SET_EXPERIENCE",
   "GENERATE_EXPERIENCE",
   "SET_INTEGRATION_CONTRACT",
@@ -137,6 +141,7 @@ export const ACTION_ROLES: Record<ActionType, ActorRole[]> = {
   SUBMIT_FOR_REVIEW: CONSULTANT,
   UPDATE_BLUEPRINT: [...CONSULTANT, "CLIENT_PROCESS_OWNER", "CLIENT_BUSINESS_OWNER", "CLIENT_ARCHITECT"],
   SET_VALUE_NORTH_STAR: [...CONSULTANT, "CLIENT_BUSINESS_OWNER", "CLIENT_PROCESS_OWNER"],
+  SET_ENTERPRISE_CONTEXT: [...CONSULTANT, "CLIENT_ARCHITECT", "CLIENT_IT_OPERATIONS", "SECURITY_PRIVACY"],
   SET_EXPERIENCE: CONSULTANT,
   GENERATE_EXPERIENCE: CONSULTANT,
   SET_INTEGRATION_CONTRACT: [...CONSULTANT, "CLIENT_ARCHITECT"],
@@ -662,7 +667,8 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
       case "SET_STEP": {
         const st = find(sid);
         const fields = (p.fields as Partial<WorkflowStep>) ?? {};
-        const allowed: (keyof WorkflowStep)[] = ["name", "owner", "lane", "type", "purpose", "trigger", "inputs", "aiRole", "humanAuthority", "systems", "reads", "writes", "exceptions", "rerun", "outcome", "writeback", "notes", "phase", "currentAiRefs", "evidenceRefs"];
+        const allowed: (keyof WorkflowStep)[] = ["name", "owner", "lane", "type", "purpose", "trigger", "inputs", "aiRole", "humanAuthority", "systems", "reads", "writes", "exceptions", "rerun", "outcome", "writeback", "notes", "phase", "currentAiRefs", "evidenceRefs", "basis"];
+        if (fields.basis && !BASIS_VALUES.includes(fields.basis)) throw new ActionError("INVALID_REQUEST", `Unknown basis ${String(fields.basis)}`);
         for (const k of allowed) if (k in fields) (st as unknown as Record<string, unknown>)[k] = (fields as Record<string, unknown>)[k];
         st.status = "open";
         bumpBlueprint(ctx, bp, `Edited ${st.contractId}`, [st.contractId]);
@@ -709,7 +715,8 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
       case "ADD_RULE": {
         const st = find(sid);
         const r = p.rule as Partial<Rule>;
-        st.rules.push({ ruleId: `${st.contractId}-R${String(st.rules.length + 1).padStart(2, "0")}`, statement: str(r?.statement, "rule.statement"), ruleType: (r?.ruleType ?? "Business Policy") as Rule["ruleType"], hardStop: !!r?.hardStop, provenance: { sourceType: r?.provenance?.sourceType ?? "TO_VALIDATE", sourceRef: r?.provenance?.sourceRef ?? "", status: r?.provenance?.status ?? "UNCONFIRMED" } });
+        str(r?.statement, "rule.statement");
+        st.rules.push(normalizeRule(r, nextRuleId(st)));
         bumpBlueprint(ctx, bp, `Rule added to ${st.contractId}`, [st.contractId]);
         break;
       }
@@ -721,6 +728,7 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
         if (f.statement) r.statement = f.statement;
         if (f.ruleType) r.ruleType = f.ruleType;
         if (typeof f.hardStop === "boolean") r.hardStop = f.hardStop;
+        if (f.basis && BASIS_VALUES.includes(f.basis)) r.basis = f.basis;
         if (f.provenance) r.provenance = { ...r.provenance, ...f.provenance };
         bumpBlueprint(ctx, bp, `Rule ${r.ruleId} updated`, f.statement || typeof f.hardStop === "boolean" ? [st.contractId] : [], !!(f.statement || typeof f.hardStop === "boolean"));
         break;
@@ -765,6 +773,8 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
         const nums = st.humanActions.map((x) => Number(x.actionId.split("-A").pop()) || 0);
         const actionId = `${st.contractId}-A${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0")}`;
         st.humanActions.push(normalizeAction({ ...a, actionId }));
+        st.noHumanDecision = false;
+        st.noHumanDecisionReason = "";
         bumpBlueprint(ctx, bp, `Human action ${actionId} added`, [st.contractId]);
         ctx.data = { actionId };
         break;
@@ -790,6 +800,14 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
       case "CONFIRM_ALL_ACTIONS": {
         activeSteps(bp).forEach((x) => x.humanActions.forEach((a) => (a.reviewStatus = "confirmed")));
         bumpBlueprint(ctx, bp, "All human actions confirmed", [], false);
+        break;
+      }
+      case "SET_HUMAN_DECISION": {
+        // Explicit statement that nobody decides at this step. Does not reopen the structure review; a later human action clears it.
+        const st = find(sid);
+        st.noHumanDecision = p.noHumanDecision === true;
+        st.noHumanDecisionReason = st.noHumanDecision ? str(p.reason, "reason") : "";
+        bumpBlueprint(ctx, bp, st.noHumanDecision ? `${st.contractId}: no human decision at this step` : `${st.contractId}: human decision expected`, [], false);
         break;
       }
       case "SET_AUTHORITY": {
@@ -842,6 +860,65 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
     }
     ctx.events.push({ type: confirm ? "DECISION_RECORDED" : "WORKFLOW_CHANGED", summary: confirm ? "Value North Star confirmed" : "Value North Star updated" });
     ctx.message = confirm ? "Value North Star confirmed." : "Value North Star updated (unconfirmed).";
+  },
+
+  /**
+   * Enterprise context: the client's standards, systems, integration patterns, data domains, security constraints and AI policy.
+   * Any authorized role edits it; only the client architect (or delivery lead on their behalf) confirms it. Editing reopens it.
+   */
+  SET_ENTERPRISE_CONTEXT(ctx) {
+    const s = ctx.state;
+    const p = ctx.req.payload ?? {};
+    const cur = clone(getEnterpriseContext(s));
+    const confirm = p.confirm === true;
+    const op = typeof p.op === "string" ? p.op : confirm ? "CONFIRM" : "MERGE";
+    let changed = false;
+    if (op === "MERGE" || op === "REPLACE") {
+      const incoming = (p.enterpriseContext as Partial<EnterpriseContext>) ?? {};
+      for (const k of ENTERPRISE_SECTIONS) {
+        if (!Array.isArray(incoming[k])) continue;
+        const rows = (incoming[k] as Partial<EnterpriseEntry>[]).map((e) => normalizeEnterpriseEntry(e, s));
+        cur[k] = op === "REPLACE" ? rows : [...cur[k], ...rows];
+        changed = true;
+      }
+      if (typeof incoming.summary === "string") { cur.summary = incoming.summary; changed = true; }
+      if (Array.isArray(incoming.gaps)) { cur.gaps = op === "REPLACE" ? incoming.gaps.map(String) : [...cur.gaps, ...incoming.gaps.map(String)]; changed = true; }
+    } else if (op === "REMOVE_ENTRY") {
+      const id = str(p.entryId, "entryId");
+      for (const k of ENTERPRISE_SECTIONS) {
+        const before = cur[k].length;
+        cur[k] = cur[k].filter((e) => e.id !== id);
+        if (cur[k].length !== before) changed = true;
+      }
+      pre(changed, `Entry ${id} not found`);
+    } else if (op === "SET_ENTRY") {
+      const id = str(p.entryId, "entryId");
+      const fields = (p.fields as Partial<EnterpriseEntry>) ?? {};
+      for (const k of ENTERPRISE_SECTIONS) {
+        const e = cur[k].find((x) => x.id === id);
+        if (e) { Object.assign(e, normalizeEnterpriseEntry({ ...e, ...fields, id }, s)); changed = true; }
+      }
+      pre(changed, `Entry ${id} not found`);
+    } else if (op !== "CONFIRM") throw new ActionError("INVALID_REQUEST", `Unknown enterprise context op ${op}`);
+    if (changed) {
+      cur.version += 1;
+      cur.reviewStatus = "OPEN";
+      delete cur.confirmedBy;
+    }
+    if (confirm) {
+      pre(enterpriseEntryCount(cur) > 0, "Nothing to confirm: the enterprise context is empty");
+      const auth = actorMayDecide(ctx.req.actor, ["CLIENT_ARCHITECT", "CLIENT_IT_OPERATIONS", "SECURITY_PRIVACY"]);
+      if (!auth.ok) throw new ActionError("UNAUTHORIZED", `Enterprise context confirmation: ${auth.reason}`);
+      const decisionId = nextId(s, "DEC");
+      recordDecision(s, { decisionId, type: "APPROVE", target: { type: "ARTIFACT", id: "enterprise-context" }, actor: ctx.req.actor, rationale: String(ctx.req.reason ?? "Enterprise context confirmed as the grounding for workflow design"), at: ctx.at }, s.currentStage);
+      cur.reviewStatus = "CONFIRMED";
+      cur.confirmedBy = { actor: ctx.req.actor, at: ctx.at, decisionId };
+    }
+    cur.updatedAt = ctx.at;
+    s.enterpriseContext = cur;
+    ctx.events.push({ type: confirm ? "DECISION_RECORDED" : "WORKFLOW_CHANGED", summary: confirm ? `Enterprise context v${cur.version} confirmed` : `Enterprise context updated (${op}, v${cur.version})` });
+    ctx.message = confirm ? "Enterprise context confirmed." : "Enterprise context updated (unconfirmed).";
+    ctx.data = { version: cur.version, reviewStatus: cur.reviewStatus };
   },
 
   SET_EXPERIENCE(ctx) {
@@ -1197,6 +1274,31 @@ function findJob(ctx: Ctx) {
   return job;
 }
 
+function normalizeEnterpriseEntry(e: Partial<EnterpriseEntry>, s: FactoryState): EnterpriseEntry {
+  const known = new Set(s.evidenceCatalog.map((x) => x.evidenceRef));
+  const refs = Array.isArray(e.evidenceRefs) ? e.evidenceRefs.map(String) : [];
+  const statuses: EnterpriseEntry["status"][] = ["DOCUMENTED", "CLIENT_STATED", "TO_CONFIRM"];
+  let status: EnterpriseEntry["status"] = e.status && statuses.includes(e.status) ? e.status : "TO_CONFIRM";
+  // DOCUMENTED needs a real evidence record behind it; otherwise it is at best stated.
+  if (status === "DOCUMENTED" && !refs.some((r) => known.has(r))) status = refs.length ? "TO_CONFIRM" : "CLIENT_STATED";
+  const entry: EnterpriseEntry = { id: e.id && /^ENT-\d+$/.test(e.id) ? e.id : nextId(s, "ENT"), name: String(e.name ?? "").trim() || "TO_CONFIRM", detail: String(e.detail ?? ""), qualifier: String(e.qualifier ?? ""), owner: String(e.owner ?? "TO_CONFIRM"), evidenceRefs: refs, status };
+  if (e.sensitivity) entry.sensitivity = e.sensitivity;
+  return entry;
+}
+
+/** Evidence references the specialist cited must exist in this engagement's catalog; unknown ones are flagged rather than trusted. */
+function flagUnknownEvidenceRefs(ctx: Ctx, steps: WorkflowStep[]) {
+  const s = ctx.state;
+  const known = new Set(s.evidenceCatalog.map((e) => e.evidenceRef));
+  const unknownRefs = new Set<string>();
+  for (const st of steps) {
+    st.evidenceRefs.filter((r) => !known.has(r)).forEach((r) => unknownRefs.add(r));
+    st.rules.forEach((r) => { if (r.provenance.sourceRef && /^EV-/.test(r.provenance.sourceRef) && !known.has(r.provenance.sourceRef)) unknownRefs.add(r.provenance.sourceRef); });
+    st.checks.forEach((c) => c.sourceRefs.filter((r) => !known.has(r)).forEach((r) => unknownRefs.add(r)));
+  }
+  if (unknownRefs.size) s.openItems.push({ itemId: nextId(s, "OPN"), kind: "QUESTION", title: `Draft cites evidence not in the catalog: ${[...unknownRefs].join(", ")}`, detail: "The specialist referenced evidence IDs that do not exist in this engagement. Treat the affected rules and checks as unsupported until re-linked.", owner: "Consultant", stage: s.currentStage, relatedIds: [...unknownRefs], status: "OPEN", raisedAt: ctx.at });
+}
+
 function applyRecommendationPayload(ctx: Ctx, rec: Recommendation, draft: Record<string, unknown>) {
   const s = ctx.state;
   const kind = String(draft.kind ?? "");
@@ -1223,17 +1325,117 @@ function applyRecommendationPayload(ctx: Ctx, rec: Recommendation, draft: Record
     if (Array.isArray(draft.openItems)) for (const o of draft.openItems as { title: string; detail: string; owner?: string; relatedIds?: string[] }[]) s.openItems.push({ itemId: nextId(s, "TC"), kind: "TO_CONFIRM", title: o.title, detail: o.detail, owner: o.owner ?? "TO_CONFIRM", stage: s.currentStage, relatedIds: o.relatedIds ?? [], status: "OPEN", raisedAt: ctx.at });
     // Contradictions the specialist noticed in prose become open questions; the deterministic engine only sees structured claims.
     if (Array.isArray(draft.contradictionsNoted)) for (const c of draft.contradictionsNoted as string[]) if (c.trim()) s.openItems.push({ itemId: nextId(s, "OPN"), kind: "QUESTION", title: `Specialist noted a contradiction: ${c.slice(0, 80)}`, detail: c, owner: "Consultant", stage: s.currentStage, relatedIds: [], status: "OPEN", raisedAt: ctx.at });
-    // Evidence references the specialist cited must exist in this engagement's catalog; unknown ones are flagged rather than trusted.
-    const known = new Set(s.evidenceCatalog.map((e) => e.evidenceRef));
-    const unknownRefs = new Set<string>();
-    for (const st of normalized.steps) {
-      st.evidenceRefs.filter((r) => !known.has(r)).forEach((r) => unknownRefs.add(r));
-      st.rules.forEach((r) => { if (r.provenance.sourceRef && /^EV-/.test(r.provenance.sourceRef) && !known.has(r.provenance.sourceRef)) unknownRefs.add(r.provenance.sourceRef); });
-      st.checks.forEach((c) => c.sourceRefs.filter((r) => !known.has(r)).forEach((r) => unknownRefs.add(r)));
-    }
-    if (unknownRefs.size) s.openItems.push({ itemId: nextId(s, "OPN"), kind: "QUESTION", title: `Draft cites evidence not in the catalog: ${[...unknownRefs].join(", ")}`, detail: "The specialist referenced evidence IDs that do not exist in this engagement. Treat the affected rules and checks as unsupported until re-linked.", owner: "Consultant", stage: s.currentStage, relatedIds: [...unknownRefs], status: "OPEN", raisedAt: ctx.at });
+    flagUnknownEvidenceRefs(ctx, normalized.steps);
     touchStageExecution(ctx, "IN_PROGRESS");
     ctx.events.push({ type: "WORKFLOW_CHANGED", summary: `Blueprint v${normalized.version} accepted from AI recommendation; all items open for human review` });
+  } else if (kind === "BLUEPRINT_ENRICHMENT") {
+    // Per-step enrichment: rules, checks and human actions for steps whose structure a human has already confirmed.
+    // Unreviewed items on those steps are replaced by the new draft; items a human has confirmed are kept. Step status is untouched.
+    const existing = getBlueprint(s);
+    pre(existing, "No blueprint to enrich");
+    const bp = clone(existing!);
+    const incoming = (draft.steps as (WorkflowStepInput & { contractId: string })[]) ?? [];
+    const enriched: string[] = [];
+    const skipped: string[] = [];
+    for (const inc of incoming) {
+      const st = bp.steps.find((x) => x.contractId === inc.contractId && !x.archived);
+      if (!st || st.status !== "confirmed") {
+        skipped.push(inc.contractId);
+        continue;
+      }
+      const keptRules = st.rules.filter((r) => ["CLIENT_CONFIRMED", "VERIFIED"].includes(r.provenance.status));
+      st.rules = keptRules.map((r, i) => ({ ...r, ruleId: `${st.contractId}-R${String(i + 1).padStart(2, "0")}` }));
+      for (const r of inc.rules ?? []) st.rules.push(normalizeRule(r, nextRuleId(st)));
+      st.checks = st.checks.filter((c) => c.reviewStatus === "confirmed");
+      for (const c of inc.checks ?? []) {
+        const nums = st.checks.map((x) => Number(x.checkId.split("-C").pop()) || 0);
+        const checkId = `${st.contractId}-C${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0")}`;
+        st.checks.push(normalizeCheck({ ...c, checkId, execution: { stepId: st.contractId, persona: c.execution?.persona ?? st.owner, point: c.execution?.point ?? "During step" }, reviewStatus: "open" }, st));
+      }
+      st.humanActions = st.humanActions.filter((a) => a.reviewStatus === "confirmed");
+      for (const a of inc.humanActions ?? []) {
+        const nums = st.humanActions.map((x) => Number(x.actionId.split("-A").pop()) || 0);
+        st.humanActions.push(normalizeAction({ ...a, actionId: `${st.contractId}-A${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0")}`, reviewStatus: "open" }));
+      }
+      if (st.humanActions.length) {
+        st.noHumanDecision = false;
+        st.noHumanDecisionReason = "";
+      } else if (inc.noHumanDecision === true) {
+        st.noHumanDecision = true;
+        st.noHumanDecisionReason = inc.noHumanDecisionReason ?? "";
+      }
+      enriched.push(st.contractId);
+    }
+    pre(enriched.length > 0, `No confirmed steps matched the enrichment (${skipped.join(", ") || "none proposed"})`);
+    bp.version = bumpVersion(bp.version);
+    bp.changeLog.push({ at: ctx.at, stateRevision: s.stateRevision + 1, summary: `Enriched ${enriched.length} confirmed step(s) from ${rec.recommendationRef}${skipped.length ? `; skipped unconfirmed ${skipped.join(", ")}` : ""}`, affectedIds: enriched, by: `${ctx.req.actor.role}:${ctx.req.actor.userId}` });
+    s.artifactContent[CONTENT_KEYS.blueprint] = bp;
+    const art = currentArtifact(s, "WORKFLOW_BLUEPRINT");
+    if (art) art.version = bp.version;
+    if (Array.isArray(draft.openItems)) for (const o of draft.openItems as { title: string; detail: string; owner?: string; relatedIds?: string[] }[]) s.openItems.push({ itemId: nextId(s, "TC"), kind: "TO_CONFIRM", title: o.title, detail: o.detail, owner: o.owner ?? "TO_CONFIRM", stage: s.currentStage, relatedIds: o.relatedIds ?? [], status: "OPEN", raisedAt: ctx.at });
+    flagUnknownEvidenceRefs(ctx, bp.steps.filter((x) => enriched.includes(x.contractId)));
+    touchStageExecution(ctx, "IN_PROGRESS");
+    ctx.events.push({ type: "WORKFLOW_CHANGED", summary: `Blueprint v${bp.version}: ${enriched.length} step(s) enriched from AI recommendation; new rules, checks and actions open for review`, refs: enriched });
+  } else if (kind === "CITATION_VERDICTS") {
+    // Citation verification: each rule that cites evidence was checked against that record. Unsupported citations become DISPUTED.
+    // Rules a human already confirmed or verified are never downgraded silently; a question is raised instead.
+    const existing = getBlueprint(s);
+    pre(existing, "No blueprint to verify");
+    const bp = clone(existing!);
+    const known = new Set(s.evidenceCatalog.filter((e) => e.authorityStatus === "CURRENT").map((e) => e.evidenceRef));
+    const verdicts = (draft.verdicts as { ruleId: string; verdict: CitationVerdict; quote?: string; note?: string }[]) ?? [];
+    const disputed: string[] = [];
+    const supported: string[] = [];
+    const contested: string[] = [];
+    let checked = 0;
+    for (const st of activeSteps(bp)) {
+      for (const r of st.rules) {
+        if (!r.provenance.sourceRef.trim()) continue;
+        const v = verdicts.find((x) => x.ruleId === r.ruleId);
+        const missing = /^EV-/.test(r.provenance.sourceRef) && !known.has(r.provenance.sourceRef);
+        if (!v && !missing) continue;
+        const verdict = missing ? "SOURCE_MISSING" : v!.verdict;
+        checked += 1;
+        r.provenance.verification = { verdict, quote: String(v?.quote ?? ""), note: missing ? `Cited ${r.provenance.sourceRef} is not in this engagement's evidence catalog` : String(v?.note ?? ""), at: ctx.at, recommendationRef: rec.recommendationRef };
+        const humanHeld = ["CLIENT_CONFIRMED", "VERIFIED"].includes(r.provenance.status);
+        if (verdict === "NOT_SUPPORTED" || verdict === "SOURCE_MISSING") {
+          if (humanHeld) contested.push(r.ruleId);
+          else {
+            r.provenance.status = "DISPUTED";
+            disputed.push(r.ruleId);
+          }
+        } else if (verdict === "SUPPORTED" && r.provenance.status === "UNCONFIRMED") {
+          r.provenance.status = "SOURCE_SUPPORTED";
+          supported.push(r.ruleId);
+        } else if (verdict === "SUPPORTED") supported.push(r.ruleId);
+      }
+    }
+    if (contested.length) s.openItems.push({ itemId: nextId(s, "OPN"), kind: "QUESTION", title: `Citation check contradicts ${contested.length} human-confirmed rule(s): ${contested.join(", ")}`, detail: "The cited evidence does not support these rules, but a human already confirmed or verified them. Re-check the source or the confirmation.", owner: "Consultant", stage: s.currentStage, relatedIds: contested, status: "OPEN", raisedAt: ctx.at });
+    bp.version = bumpVersion(bp.version);
+    bp.changeLog.push({ at: ctx.at, stateRevision: s.stateRevision + 1, summary: `Citation check ${rec.recommendationRef}: ${checked} rule(s) checked, ${disputed.length} disputed, ${supported.length} supported${contested.length ? `, ${contested.length} contested` : ""}`, affectedIds: [...disputed, ...contested], by: `${ctx.req.actor.role}:${ctx.req.actor.userId}` });
+    s.artifactContent[CONTENT_KEYS.blueprint] = bp;
+    const art = currentArtifact(s, "WORKFLOW_BLUEPRINT");
+    if (art) art.version = bp.version;
+    ctx.events.push({ type: "WORKFLOW_CHANGED", summary: `Citation check applied: ${disputed.length} rule(s) marked DISPUTED, ${supported.length} supported`, refs: disputed });
+    ctx.data = { ...ctx.data, checked, disputed, supported, contested };
+  } else if (kind === "ENTERPRISE_CONTEXT") {
+    // AI-drafted landscape enters unconfirmed; entries the draft repeats by name are replaced, others are kept.
+    const cur = clone(getEnterpriseContext(s));
+    const incoming = (draft.enterpriseContext as Partial<EnterpriseContext>) ?? {};
+    for (const k of ENTERPRISE_SECTIONS) {
+      const rows = ((incoming[k] as Partial<EnterpriseEntry>[]) ?? []).map((e) => normalizeEnterpriseEntry(e, s));
+      const names = new Set(rows.map((r) => r.name.trim().toLowerCase()));
+      cur[k] = [...cur[k].filter((e) => !names.has(e.name.trim().toLowerCase())), ...rows];
+    }
+    if (typeof incoming.summary === "string" && incoming.summary.trim()) cur.summary = incoming.summary;
+    cur.gaps = [...new Set([...cur.gaps, ...((incoming.gaps as string[]) ?? []).map(String)])];
+    cur.version += 1;
+    cur.reviewStatus = "OPEN";
+    delete cur.confirmedBy;
+    cur.updatedAt = ctx.at;
+    s.enterpriseContext = cur;
+    if (Array.isArray(draft.openItems)) for (const o of draft.openItems as { title: string; detail: string; owner?: string; relatedIds?: string[] }[]) s.openItems.push({ itemId: nextId(s, "TC"), kind: "TO_CONFIRM", title: o.title, detail: o.detail, owner: o.owner ?? "TO_CONFIRM", stage: s.currentStage, relatedIds: o.relatedIds ?? [], status: "OPEN", raisedAt: ctx.at });
+    ctx.events.push({ type: "WORKFLOW_CHANGED", summary: `Enterprise context v${cur.version} drafted from ${rec.recommendationRef}; open for client architect confirmation` });
   } else if (kind === "INTEGRATION_CONTRACT") {
     handlers.SET_INTEGRATION_CONTRACT({ ...ctx, req: { ...ctx.req, payload: { contract: draft.contract } } });
   } else if (kind === "TRANSFORMATION_PLAN") {
@@ -1262,6 +1464,12 @@ function applyRecommendationPayload(ctx: Ctx, rec: Recommendation, draft: Record
 
 function resequence(bp: Blueprint) {
   bp.steps.sort((a, b) => a.seq - b.seq).forEach((s, i) => (s.seq = i + 1));
+}
+
+export function normalizeRule(r: Partial<Rule>, ruleId: string): Rule {
+  const rule: Rule = { ruleId, statement: r.statement ?? "", ruleType: r.ruleType ?? "Business Policy", hardStop: !!r.hardStop, basis: r.basis && BASIS_VALUES.includes(r.basis) ? r.basis : "INFERRED", provenance: { sourceType: r.provenance?.sourceType ?? "TO_VALIDATE", sourceRef: r.provenance?.sourceRef ?? "", status: r.provenance?.status ?? "UNCONFIRMED" } };
+  if (r.provenance?.verification) rule.provenance.verification = r.provenance.verification;
+  return rule;
 }
 
 export function normalizeAction(a: Partial<HumanAction> & { actionId: string }): HumanAction {
@@ -1315,6 +1523,9 @@ export function normalizeStep(s: WorkflowStepInput & { contractId: string }, bp:
     outcome: s.outcome ?? "",
     writeback: s.writeback ?? "",
     notes: s.notes ?? "",
+    basis: s.basis && BASIS_VALUES.includes(s.basis) ? s.basis : "INFERRED",
+    noHumanDecision: s.noHumanDecision === true,
+    noHumanDecisionReason: s.noHumanDecisionReason ?? "",
     status: s.status ?? "open",
     archived: !!s.archived,
     origin: s.origin ?? "BASELINE",
@@ -1326,7 +1537,7 @@ export function normalizeStep(s: WorkflowStepInput & { contractId: string }, bp:
     currentAiRefs: s.currentAiRefs ?? [],
     evidenceRefs: s.evidenceRefs ?? [],
   };
-  base.rules = (s.rules ?? []).map((r, i) => ({ ruleId: `${base.contractId}-R${String(i + 1).padStart(2, "0")}`, statement: r.statement ?? "", ruleType: r.ruleType ?? "Business Policy", hardStop: !!r.hardStop, provenance: { sourceType: r.provenance?.sourceType ?? "TO_VALIDATE", sourceRef: r.provenance?.sourceRef ?? "", status: r.provenance?.status ?? "UNCONFIRMED" } }));
+  base.rules = (s.rules ?? []).map((r, i) => normalizeRule(r, `${base.contractId}-R${String(i + 1).padStart(2, "0")}`));
   base.checks = (s.checks ?? []).map((c, i) => normalizeCheck({ ...c, checkId: c.checkId && c.checkId.startsWith(base.contractId) ? c.checkId : `${base.contractId}-C${String(i + 1).padStart(2, "0")}` }, base));
   base.humanActions = (s.humanActions ?? []).map((a, i) => normalizeAction({ ...a, actionId: a.actionId && a.actionId.startsWith(base.contractId) ? a.actionId : `${base.contractId}-A${String(i + 1).padStart(2, "0")}` }));
   return base;

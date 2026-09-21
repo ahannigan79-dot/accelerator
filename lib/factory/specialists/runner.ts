@@ -10,7 +10,9 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { runAction } from "../service";
 import type { Actor, FactoryState, TargetObject } from "../schema";
 import { compileContext, type ContextManifest } from "./context";
-import { EVIDENCE_INTAKE_CONTRACT, SPECIALISTS, type SpecialistContract, type SpecialistId } from "./contracts";
+import { BLUEPRINT_ENRICH_CONTRACT, BLUEPRINT_STRUCTURE_CONTRACT, CITATION_CHECK_CONTRACT, ENTERPRISE_CONTEXT_CONTRACT, EVIDENCE_INTAKE_CONTRACT, SPECIALISTS, type SpecialistContract, type SpecialistId } from "./contracts";
+import { getBlueprint } from "../content";
+import { activeSteps } from "../blueprint";
 
 export const DEFAULT_MODEL = "claude-opus-5";
 /** Schemas larger than this are sent in the prompt instead of compiled into a decoding grammar. */
@@ -39,20 +41,74 @@ export interface SpecialistRunResult {
   telemetry: { modelCalls: number; inputTokens: number; outputTokens: number; latencyMs: number; retries: number; cacheReadTokens: number };
 }
 
-function contractFor(specialistId: SpecialistId, task: string): SpecialistContract {
+export function contractFor(specialistId: SpecialistId, task: string): SpecialistContract {
   if (specialistId === "BLUEPRINT" && task === "EVIDENCE_INTAKE") return EVIDENCE_INTAKE_CONTRACT;
+  if (specialistId === "BLUEPRINT" && task === "STRUCTURE") return BLUEPRINT_STRUCTURE_CONTRACT;
+  if (specialistId === "BLUEPRINT" && task === "ENRICH") return BLUEPRINT_ENRICH_CONTRACT;
+  if (specialistId === "BLUEPRINT" && task === "CITATION_CHECK") return CITATION_CHECK_CONTRACT;
+  if (specialistId === "BLUEPRINT" && task === "ENTERPRISE_CONTEXT") return ENTERPRISE_CONTEXT_CONTRACT;
   return SPECIALISTS[specialistId];
+}
+
+/** Rules that cite an evidence record and can therefore be checked against it. */
+export function citedRules(state: FactoryState): { ruleId: string; stepId: string; statement: string; sourceRef: string; sourceKnown: boolean }[] {
+  const bp = getBlueprint(state);
+  if (!bp) return [];
+  const known = new Set(state.evidenceCatalog.filter((e) => e.authorityStatus === "CURRENT").map((e) => e.evidenceRef));
+  return activeSteps(bp).flatMap((st) => st.rules.filter((r) => r.provenance.sourceRef.trim()).map((r) => ({ ruleId: r.ruleId, stepId: st.contractId, statement: r.statement, sourceRef: r.provenance.sourceRef, sourceKnown: known.has(r.provenance.sourceRef) })));
+}
+
+/**
+ * Task-specific preflight and instruction. Preflight returns a reason the task cannot run; the instruction is
+ * appended to the user turn so the model works on exactly the items the state allows (confirmed steps, cited rules).
+ */
+export function taskBrief(task: string, state: FactoryState): { blocked?: string; instruction: string } {
+  const bp = getBlueprint(state);
+  if (task === "ENRICH") {
+    const confirmed = bp ? activeSteps(bp).filter((st) => st.status === "confirmed") : [];
+    if (!confirmed.length) return { blocked: "No confirmed steps to enrich. Confirm the workflow structure first.", instruction: "" };
+    return { instruction: `Enrich exactly these confirmed steps and no others: ${confirmed.map((st) => `${st.contractId} (${st.name}; owner ${st.owner}; type ${st.type})`).join("; ")}. Steps not in this list are unconfirmed and must not appear in your output.` };
+  }
+  if (task === "CITATION_CHECK") {
+    const rules = citedRules(state).filter((r) => r.sourceKnown);
+    if (!rules.length) return { blocked: "No rule cites an evidence record in the catalog. Link evidence to rules first.", instruction: "" };
+    return { instruction: `Check these citations, one verdict each:\n${rules.map((r) => `- ${r.ruleId} cites ${r.sourceRef}: "${r.statement}"`).join("\n")}` };
+  }
+  if (task === "STRUCTURE" && bp) return { instruction: `A working blueprint v${bp.version} already exists (${activeSteps(bp).length} steps). Your structure replaces it when accepted; keep existing step ids where the step is the same.` };
+  return { instruction: "" };
 }
 
 function toRecommendation(contract: SpecialistContract, parsed: Record<string, unknown>, state: FactoryState): { title: string; summary: string; rationale: string; confidence: "LOW" | "MEDIUM" | "HIGH"; payload: Record<string, unknown>; target: TargetObject; question: string } {
   const base = { summary: String(parsed.summary ?? ""), rationale: String(parsed.rationale ?? ""), confidence: (parsed.confidence as "LOW" | "MEDIUM" | "HIGH") ?? "MEDIUM" };
   switch (contract.producesKind) {
     case "BLUEPRINT": {
+      const structureOnly = contract === BLUEPRINT_STRUCTURE_CONTRACT;
+      const steps = (parsed.steps as Record<string, unknown>[]).map((s) => ({
+        ...s,
+        rules: (s.rules as unknown[]) ?? [],
+        humanActions: (s.humanActions as unknown[]) ?? [],
+        checks: ((s.checks as Record<string, unknown>[]) ?? []).map((c) => ({ ...c, execution: { stepId: s.contractId, persona: c.executionPersona, point: c.executionPoint } })),
+      }));
+      return { ...base, title: structureOnly ? "Workflow structure draft" : `Blueprint draft from ${contract.name}`, payload: { kind: "BLUEPRINT", blueprint: { workflowId: state.workflowId, mode: state.currentStage === "TARGET_DESIGN" ? "TARGET" : "BASELINE", phases: parsed.phases, steps, currentAi: parsed.currentAi }, valueNorthStar: parsed.valueNorthStar, openItems: parsed.openItems, contradictionsNoted: parsed.contradictionsNoted, referenceArchitecture: parsed.referenceArchitecture }, target: { type: "WORKFLOW", id: state.workflowId }, question: structureOnly ? `Accept this ${steps.length}-step structure as the working design? Steps arrive OPEN; confirm them, then run enrichment to draft rules, checks and actions per confirmed step.` : `Accept this ${steps.length}-step draft into the working design? Every step, check and action will remain OPEN for human review.` };
+    }
+    case "BLUEPRINT_ENRICHMENT": {
       const steps = (parsed.steps as Record<string, unknown>[]).map((s) => ({
         ...s,
         checks: ((s.checks as Record<string, unknown>[]) ?? []).map((c) => ({ ...c, execution: { stepId: s.contractId, persona: c.executionPersona, point: c.executionPoint } })),
-      }));
-      return { ...base, title: `Blueprint draft from ${contract.name}`, payload: { kind: "BLUEPRINT", blueprint: { workflowId: state.workflowId, mode: state.currentStage === "TARGET_DESIGN" ? "TARGET" : "BASELINE", phases: parsed.phases, steps, currentAi: parsed.currentAi }, valueNorthStar: parsed.valueNorthStar, openItems: parsed.openItems, contradictionsNoted: parsed.contradictionsNoted, referenceArchitecture: parsed.referenceArchitecture }, target: { type: "WORKFLOW", id: state.workflowId }, question: `Accept this ${steps.length}-step draft into the working design? Every step, check and action will remain OPEN for human review.` };
+      })) as Record<string, unknown>[];
+      const counts = steps.reduce<{ rules: number; checks: number; actions: number }>((acc, s) => ({ rules: acc.rules + ((s.rules as unknown[]) ?? []).length, checks: acc.checks + ((s.checks as unknown[]) ?? []).length, actions: acc.actions + ((s.humanActions as unknown[]) ?? []).length }), { rules: 0, checks: 0, actions: 0 });
+      return { ...base, title: `Enrichment for ${steps.length} confirmed step(s)`, payload: { kind: "BLUEPRINT_ENRICHMENT", steps, openItems: parsed.openItems }, target: { type: "WORKFLOW", id: state.workflowId }, question: `Accept ${counts.rules} rule(s), ${counts.checks} check(s) and ${counts.actions} human action(s) onto the confirmed steps? Unreviewed items on those steps are replaced; confirmed items are kept. Step structure stays confirmed.` };
+    }
+    case "CITATION_VERDICTS": {
+      const verdicts = (parsed.verdicts as { verdict: string }[]) ?? [];
+      const unsupported = verdicts.filter((v) => v.verdict === "NOT_SUPPORTED" || v.verdict === "SOURCE_MISSING").length;
+      return { ...base, title: `Citation check: ${verdicts.length} rule(s), ${unsupported} unsupported`, payload: { kind: "CITATION_VERDICTS", verdicts }, target: { type: "WORKFLOW", id: state.workflowId }, question: `Apply these verdicts? ${unsupported} rule(s) with unsupported citations become DISPUTED; supported citations move UNCONFIRMED rules to SOURCE_SUPPORTED. Rules a human confirmed are never downgraded silently.` };
+    }
+    case "ENTERPRISE_CONTEXT": {
+      const ec = parsed.enterpriseContext as Record<string, unknown[]>;
+      const n = ["architectureStandards", "systems", "integrationPatterns", "dataDomains", "securityCompliance", "aiPolicy"].reduce((a, k) => a + ((ec[k] as unknown[]) ?? []).length, 0);
+      const rows = Object.fromEntries(Object.entries(ec).map(([k, v]) => [k, Array.isArray(v) ? v.map((e) => (e && typeof e === "object" ? { ...(e as Record<string, unknown>), sensitivity: (e as Record<string, unknown>).sensitivity ?? undefined } : e)) : v]));
+      return { ...base, title: `Enterprise context draft (${n} entries)`, payload: { kind: "ENTERPRISE_CONTEXT", enterpriseContext: rows, openItems: parsed.openItems }, target: { type: "ARTIFACT", id: "enterprise-context" }, question: `Accept this ${n}-entry enterprise context draft? It stays unconfirmed until the client architect confirms it; entries with the same name are replaced, others kept.` };
     }
     case "INTEGRATION_CONTRACT":
       return { ...base, title: "Integration & Data Contract draft", payload: { kind: "INTEGRATION_CONTRACT", contract: { integrations: (parsed.integrations as Record<string, unknown>[]).map((i) => ({ ...i, evidenceRefs: [], readinessHistory: [] })), data: parsed.data, sourceWorkflowVersion: "" } }, target: { type: "INTEGRATION", id: "integration-contract" }, question: "Accept this Integration & Data Contract draft? Readiness states remain exactly as evidenced." };
@@ -92,6 +148,11 @@ export async function queueSpecialist(engagementId: string, specialistId: Specia
     await runAction(engagementId, { actionType: "FAIL_JOB", actor, payload: { jobId, error: `Context ${manifest.sufficiency}: ${manifest.sufficiencyDetail}` } });
     return { jobId, manifest, earlyResult: { jobId, status: "INSUFFICIENT_CONTEXT", manifest, error: manifest.sufficiencyDetail, telemetry } };
   }
+  const brief = taskBrief(task, queued.state);
+  if (brief.blocked) {
+    await runAction(engagementId, { actionType: "FAIL_JOB", actor, payload: { jobId, error: brief.blocked } });
+    return { jobId, manifest, earlyResult: { jobId, status: "INSUFFICIENT_CONTEXT", manifest, error: brief.blocked, telemetry } };
+  }
   if (!client && !aiAvailable()) {
     await runAction(engagementId, { actionType: "FAIL_JOB", actor, payload: { jobId, error: "AI worker unavailable: no Anthropic credentials configured. Deterministic controls and human decisions continue to operate." } });
     return { jobId, manifest, earlyResult: { jobId, status: "FAILED", manifest, error: "AI worker unavailable", telemetry } };
@@ -115,7 +176,8 @@ export async function executeSpecialist(engagementId: string, jobId: string, man
     // Constrained decoding compiles the schema into a grammar; the API rejects large ones. Above the threshold the schema
     // travels in the prompt instead and the output is validated locally, with one repair round on validation failure.
     const constrained = schemaJson.length <= MAX_GRAMMAR_SCHEMA_CHARS;
-    const userText = `Context Manifest ${manifest.manifestId} (state revision ${manifest.stateRevision}, sufficiency ${manifest.sufficiency}).\nSections: ${manifest.sectionsIncluded.join(", ")}.\nExclusions: ${manifest.exclusions.join("; ")}.\n\n${JSON.stringify(manifest.body)}\n\nTask: ${task === "DEFAULT" ? contract.objective : task}.${constrained ? " Respond with the structured output only." : `\n\nRespond with a single JSON object and nothing else (no prose, no code fence) that conforms exactly to this JSON Schema:\n${schemaJson}`}`;
+    const brief = taskBrief(task, state);
+    const userText = `Context Manifest ${manifest.manifestId} (state revision ${manifest.stateRevision}, sufficiency ${manifest.sufficiency}).\nSections: ${manifest.sectionsIncluded.join(", ")}.\nExclusions: ${manifest.exclusions.join("; ")}.\n\n${JSON.stringify(manifest.body)}\n\nTask: ${contract.objective}${brief.instruction ? `\n${brief.instruction}` : ""}${constrained ? " Respond with the structured output only." : `\n\nRespond with a single JSON object and nothing else (no prose, no code fence) that conforms exactly to this JSON Schema:\n${schemaJson}`}`;
     const messages: Anthropic.MessageParam[] = [{ role: "user", content: userText }];
     let parsed: Record<string, unknown> | null = null;
     let lastError = "";

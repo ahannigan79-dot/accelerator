@@ -4,7 +4,7 @@
  */
 
 import { activeSteps } from "../blueprint";
-import { getBaseline, getBlueprint, getBuildContract, getIntegrationContract, getSimulationPacks, getTechnicalDesign, getTransformationPlan, getValidationReport } from "../content";
+import { getBaseline, getBlueprint, getBuildContract, getIntegrationContract, getSimulationPacks, getTechnicalDesign, getTransformationPlan, getValidationReport, enterpriseEntryCount, getEnterpriseContext } from "../content";
 import type { FactoryState } from "../schema";
 import type { ContextSection, SpecialistContract } from "./contracts";
 
@@ -46,6 +46,8 @@ function sectionAvailable(state: FactoryState, section: ContextSection): boolean
       return true;
     case "EVIDENCE":
       return state.evidenceCatalog.some((e) => e.authorityStatus === "CURRENT");
+    case "ENTERPRISE":
+      return enterpriseEntryCount(getEnterpriseContext(state)) > 0;
     case "BLUEPRINT":
       return !!getBlueprint(state);
     case "BASELINE":
@@ -71,6 +73,10 @@ function sectionBody(state: FactoryState, section: ContextSection): unknown {
       return { engagementId: state.engagement_id, workflowId: state.workflowId, setup: state.engagementSetup, currentStage: state.currentStage, targetDesignMode: state.targetDesignMode, factoryVersion: state.factoryVersion };
     case "EVIDENCE":
       return state.evidenceCatalog.filter((e) => e.authorityStatus === "CURRENT").map((e) => ({ evidenceRef: e.evidenceRef, title: e.title, fileName: e.fileName, evidenceType: e.evidenceType, sourceClass: e.sourceClass, synthetic: e.synthetic, environment: e.environment, capturedAt: e.capturedAt, scope: e.scope, requirementIds: e.requirementIds, claims: e.claims, summary: e.summary, content: e.content ? (e.content.length > MAX_CONTENT_PER_RECORD ? `${e.content.slice(0, MAX_CONTENT_PER_RECORD)}\n[... truncated ${e.content.length - MAX_CONTENT_PER_RECORD} chars]` : e.content) : undefined }));
+    case "ENTERPRISE": {
+      const e = getEnterpriseContext(state);
+      return { reviewStatus: e.reviewStatus, version: e.version, summary: e.summary, architectureStandards: e.architectureStandards, systems: e.systems, integrationPatterns: e.integrationPatterns, dataDomains: e.dataDomains, securityCompliance: e.securityCompliance, aiPolicy: e.aiPolicy, gaps: e.gaps };
+    }
     case "DISCOVERY":
       return { sufficiency: state.discoverySufficiency, requirements: state.evidenceReadinessProfile.requirements.map((r) => ({ requirementId: r.requirementId, description: r.description, requiredByGate: r.requiredByGate, materiality: r.materiality, status: r.status, allowedEvidenceTypes: r.allowedEvidenceTypes })) };
     case "BLUEPRINT": {

@@ -439,9 +439,9 @@ describe("Specialist run (stubbed model)", () => {
       summary: "Six-step PR-to-PO baseline", rationale: "From policy, audit and interview notes", confidence: "MEDIUM",
       phases: [{ key: "request", name: "Request", desc: "" }, { key: "source", name: "Source", desc: "" }, { key: "approve", name: "Approve", desc: "" }],
       steps: [
-        { contractId: "WF-001", phase: "request", name: "Raise purchase requisition", owner: "Requester", lane: "ops", type: "mixed", purpose: "Capture need", trigger: "Need identified", inputs: ["Material code"], aiRole: "Check completeness", humanAuthority: "Requester submits", systems: ["SAP"], reads: [], writes: ["PR"], exceptions: "Incomplete PR returned", rerun: "Re-check changed fields", outcome: "Released PR", writeback: "PR in SAP", notes: "", evidenceRefs: ["EV-001"], rules: [{ statement: "PR must carry a cost centre", ruleType: "Data Quality", hardStop: true, provenance: { sourceType: "POLICY_DOCUMENT", sourceRef: "EV-001", status: "SOURCE_SUPPORTED" } }], checks: [{ name: "Completeness", purpose: "", executionPersona: "AI", executionPoint: "On submit", supportsDecisionStepIds: ["WF-002"], inputsEvidence: "", sourceSystems: "SAP", logicType: "Deterministic", expectedResult: "COMPLETE", passAction: "Route", failAction: "Return", output: "Completeness result", writebackAction: "", authority: "System", sourceRefs: [] }], humanActions: [{ name: "Submit PR", actor: "Requester", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-002", systemImpact: "", rerunBehavior: "", auditRequirements: "Actor, timestamp" }] },
-        { contractId: "WF-002", phase: "source", name: "Obtain quotations", owner: "Buyer", lane: "purchase", type: "mixed", purpose: "Three quotes above 50k", trigger: "Released PR", inputs: [], aiRole: "Draft comparative statement", humanAuthority: "Buyer signs CS", systems: ["Outlook", "Excel"], reads: [], writes: [], exceptions: "Single source needs KI-F-33", rerun: "", outcome: "Signed CS", writeback: "", notes: "", evidenceRefs: ["EV-001", "EV-007"], rules: [], checks: [], humanActions: [] },
-        { contractId: "WF-003", phase: "approve", name: "Release purchase order", owner: "Approver per DoA", lane: "approval", type: "human", purpose: "DoA release", trigger: "PO created", inputs: [], aiRole: "", humanAuthority: "Per DoA — TO_CONFIRM which limits", systems: ["SAP"], reads: [], writes: ["PO release"], exceptions: "", rerun: "", outcome: "Released PO", writeback: "", notes: "Limits contradicted", evidenceRefs: ["EV-001", "EV-002", "EV-007"], rules: [{ statement: "POs above the Purchase Manager limit need Plant Head release", ruleType: "Human Authority", hardStop: true, provenance: { sourceType: "POLICY_DOCUMENT", sourceRef: "EV-001", status: "DISPUTED" } }], checks: [], humanActions: [{ name: "Release PO", actor: "Plant Head", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-003", systemImpact: "SAP release", rerunBehavior: "", auditRequirements: "SAP release log" }] },
+        { contractId: "WF-001", phase: "request", name: "Raise purchase requisition", owner: "Requester", lane: "ops", type: "mixed", purpose: "Capture need", trigger: "Need identified", inputs: ["Material code"], aiRole: "Check completeness", humanAuthority: "Requester submits", systems: ["SAP"], reads: [], writes: ["PR"], exceptions: "Incomplete PR returned", rerun: "Re-check changed fields", outcome: "Released PR", writeback: "PR in SAP", notes: "", basis: "DOCUMENTED", noHumanDecision: false, noHumanDecisionReason: "", evidenceRefs: ["EV-001"], rules: [{ statement: "PR must carry a cost centre", ruleType: "Data Quality", hardStop: true, basis: "DOCUMENTED", provenance: { sourceType: "POLICY_DOCUMENT", sourceRef: "EV-001", status: "SOURCE_SUPPORTED" } }], checks: [{ name: "Completeness", purpose: "", executionPersona: "AI", executionPoint: "On submit", supportsDecisionStepIds: ["WF-002"], inputsEvidence: "", sourceSystems: "SAP", logicType: "Deterministic", expectedResult: "COMPLETE", passAction: "Route", failAction: "Return", output: "Completeness result", writebackAction: "", authority: "System", sourceRefs: [] }], humanActions: [{ name: "Submit PR", actor: "Requester", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-002", systemImpact: "", rerunBehavior: "", auditRequirements: "Actor, timestamp" }] },
+        { contractId: "WF-002", phase: "source", name: "Obtain quotations", owner: "Buyer", lane: "purchase", type: "mixed", purpose: "Three quotes above 50k", trigger: "Released PR", inputs: [], aiRole: "Draft comparative statement", humanAuthority: "Buyer signs CS", systems: ["Outlook", "Excel"], reads: [], writes: [], exceptions: "Single source needs KI-F-33", rerun: "", outcome: "Signed CS", writeback: "", notes: "", basis: "OBSERVED", noHumanDecision: true, noHumanDecisionReason: "Buyer collects quotes; the sourcing decision is taken at PO release", evidenceRefs: ["EV-001", "EV-007"], rules: [], checks: [], humanActions: [] },
+        { contractId: "WF-003", phase: "approve", name: "Release purchase order", owner: "Approver per DoA", lane: "approval", type: "human", purpose: "DoA release", trigger: "PO created", inputs: [], aiRole: "", humanAuthority: "Per DoA — TO_CONFIRM which limits", systems: ["SAP"], reads: [], writes: ["PO release"], exceptions: "", rerun: "", outcome: "Released PO", writeback: "", notes: "Limits contradicted", basis: "DOCUMENTED", noHumanDecision: false, noHumanDecisionReason: "", evidenceRefs: ["EV-001", "EV-002", "EV-007"], rules: [{ statement: "POs above the Purchase Manager limit need Plant Head release", ruleType: "Human Authority", hardStop: true, basis: "DOCUMENTED", provenance: { sourceType: "POLICY_DOCUMENT", sourceRef: "EV-001", status: "DISPUTED" } }], checks: [], humanActions: [{ name: "Release PO", actor: "Plant Head", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-003", systemImpact: "SAP release", rerunBehavior: "", auditRequirements: "SAP release log" }] },
       ],
       currentAi: [{ category: "Workflow automation", capability: "SAP release strategy", currentPosition: "2019 config", treatment: "EXTEND", why: "Keep release mechanics", evidenceStatus: "CURRENT_STATE_DOCUMENTED", workflowRefs: ["WF-003"] }],
       valueNorthStar: { objective: "Reduce PR-to-PO cycle time", primaryMetric: "PR-to-PO cycle time", metricDefinition: "Days from PR release to PO release", measurementGranularity: "Per PO", unit: "days", direction: "LOWER_IS_BETTER", startEvent: "PR released", endEvent: "PO released", baseline: "TO_CONFIRM", target: "TO_CONFIRM", owner: "TO_CONFIRM", reportingCadence: "Weekly", secondaryMetrics: [] },
@@ -481,6 +481,200 @@ describe("Specialist run (stubbed model)", () => {
     expect(rec.state.valueNorthStar.primaryMetric).toBe("PR-to-PO cycle time");
     expect(bp.valueNorthStar.primaryMetric).toBe("PR-to-PO cycle time");
     expect(bp.referenceArchitecture.patterns).toContain("Dead vendor portal");
+    setStore(null);
+  });
+});
+
+describe("Enterprise context grounds workflow design", () => {
+  test("Discovery cannot close until the client architect confirms the enterprise context; editing reopens it", () => {
+    // Demo discovery: business evidence sufficient, contradiction resolved, but no enterprise context yet.
+    let s = buildDemoEngagement("DISCOVERY").state;
+    expect(s.enterpriseContext?.reviewStatus ?? "EMPTY").toBe("EMPTY");
+    expect(() => act(s, consultant, "ADVANCE_STAGE")).toThrow(/Enterprise context/);
+    expect(projectRuntime(s).nextHumanAction.route).toMatch(/\/enterprise$/);
+    expect(projectRuntime(s).nextHumanAction.title).toMatch(/Ground the enterprise context/);
+    // Empty context cannot be confirmed; a consultant cannot confirm at all.
+    expectError(() => act(s, architect, "SET_ENTERPRISE_CONTEXT", { confirm: true }), "PRECONDITION_FAILED", /empty/);
+    s = act(s, consultant, "SET_ENTERPRISE_CONTEXT", { op: "MERGE", enterpriseContext: { systems: [{ name: "ERP", detail: "System of record", qualifier: "SoR", owner: "IT", evidenceRefs: ["EV-005"], status: "DOCUMENTED" }, { name: "Side ledger", detail: "Spreadsheet at second site", qualifier: "Manual", owner: "Site accountant", evidenceRefs: [], status: "DOCUMENTED" }], gaps: ["Who owns the interface"] } }).state;
+    const ec = s.enterpriseContext!;
+    expect(ec.reviewStatus).toBe("OPEN");
+    expect(ec.systems[0].id).toMatch(/^ENT-/);
+    // DOCUMENTED without a cited record degrades to CLIENT_STATED.
+    expect(ec.systems[1].status).toBe("CLIENT_STATED");
+    expect(projectRuntime(s).nextHumanAction.title).toMatch(/Confirm the enterprise context/);
+    expectError(() => act(s, consultant, "SET_ENTERPRISE_CONTEXT", { confirm: true }), "UNAUTHORIZED");
+    s = act(s, architect, "SET_ENTERPRISE_CONTEXT", { confirm: true }, { reason: "Matches the landscape diagram" }).state;
+    expect(s.enterpriseContext!.reviewStatus).toBe("CONFIRMED");
+    expect(s.decisions.some((d) => d.target.id === "enterprise-context" && d.actor.role === "CLIENT_ARCHITECT")).toBe(true);
+    // Blueprint specialist context now carries the ENTERPRISE section.
+    const m = compileContext(s, SPECIALISTS.BLUEPRINT, consultant, "t", s.stateRevision);
+    expect(m.sectionsIncluded).toContain("ENTERPRISE");
+    // Editing reopens it.
+    s = act(s, consultant, "SET_ENTERPRISE_CONTEXT", { op: "REMOVE_ENTRY", entryId: ec.systems[1].id }).state;
+    expect(s.enterpriseContext!.reviewStatus).toBe("OPEN");
+    expect(() => act(s, consultant, "ADVANCE_STAGE")).toThrow(/Enterprise context/);
+  });
+});
+
+describe("Basis, human decision coverage and stage gating", () => {
+  test("rules and steps carry a basis; person-owned steps need a human action or an explicit no-decision statement", async () => {
+    const { stageGatingAreas } = await import("@/lib/factory/blueprint");
+    const { state } = buildDemoEngagement("BASELINE_DESIGN");
+    const bp = getBlueprint(state)!;
+    expect(bp.steps.every((s) => ["DOCUMENTED", "OBSERVED", "INFERRED"].includes(s.basis))).toBe(true);
+    let s = act(state, consultant, "UPDATE_BLUEPRINT", { op: "ADD_STEP", step: { phase: bp.phases[0].key, name: "Manual reconciliation", owner: "Site accountant", type: "human", basis: "OBSERVED" } }).state;
+    const added = getBlueprint(s)!.steps.find((x) => x.name === "Manual reconciliation")!;
+    expect(added.basis).toBe("OBSERVED");
+    let dc = designCompletionSummary(getBlueprint(s)!);
+    const cov = dc.areas.find((a) => a.key === "humanDecision")!;
+    expect(cov.total).toBeGreaterThan(0);
+    expect(cov.done).toBe(cov.total - 1);
+    s = act(s, consultant, "UPDATE_BLUEPRINT", { op: "SET_HUMAN_DECISION", stepId: added.contractId, noHumanDecision: true, reason: "Reconciliation is clerical; the decision sits at PO release" }).state;
+    dc = designCompletionSummary(getBlueprint(s)!);
+    expect(dc.areas.find((a) => a.key === "humanDecision")!.complete).toBe(true);
+    // Adding a human action clears the flag.
+    s = act(s, consultant, "UPDATE_BLUEPRINT", { op: "ADD_ACTION", stepId: added.contractId, action: { name: "Sign off reconciliation", actor: "Site accountant", targetStepId: "WF-001" } }).state;
+    expect(getBlueprint(s)!.steps.find((x) => x.contractId === added.contractId)!.noHumanDecision).toBe(false);
+    // Rule basis via ADD_RULE / SET_RULE; invalid basis rejected on steps.
+    s = act(s, consultant, "UPDATE_BLUEPRINT", { op: "ADD_RULE", stepId: added.contractId, rule: { statement: "Ledger must balance", basis: "DOCUMENTED" } }).state;
+    const step = getBlueprint(s)!.steps.find((x) => x.contractId === added.contractId)!;
+    expect(step.rules[0].basis).toBe("DOCUMENTED");
+    s = act(s, consultant, "UPDATE_BLUEPRINT", { op: "SET_RULE", stepId: added.contractId, ruleId: step.rules[0].ruleId, fields: { basis: "INFERRED" } }).state;
+    expect(getBlueprint(s)!.steps.find((x) => x.contractId === added.contractId)!.rules[0].basis).toBe("INFERRED");
+    expectError(() => act(s, consultant, "UPDATE_BLUEPRINT", { op: "SET_STEP", stepId: added.contractId, fields: { basis: "GUESSED" } }), "INVALID_REQUEST");
+    // Only structure gates baseline design; everything gates target design; nothing elsewhere.
+    expect(stageGatingAreas("BASELINE_DESIGN")).toEqual(["structure"]);
+    expect(stageGatingAreas("TARGET_DESIGN")).toContain("humanDecision");
+    expect(stageGatingAreas("BASELINE_APPROVAL")).toEqual([]);
+  });
+
+  test("next action in baseline design: confirm steps, then enrich or submit, then submit", () => {
+    const { state } = buildDemoEngagement("BASELINE_DESIGN");
+    // Demo seed already confirmed all steps and they carry rules → submit for review.
+    expect(projectRuntime(state).nextHumanAction.actionType).toBe("SUBMIT_FOR_REVIEW");
+    // Strip rules/checks/actions from every step → bare structure → enrichment suggested on the workflow page.
+    const bare = JSON.parse(JSON.stringify(state)) as FactoryState;
+    const bp = getBlueprint(bare)!;
+    bp.steps.forEach((s) => { s.rules = []; s.checks = []; s.humanActions = []; });
+    bare.artifactContent[CONTENT_KEYS.blueprint] = bp;
+    const na = projectRuntime(bare).nextHumanAction;
+    expect(na.actionType).toBe("RUN_SPECIALIST");
+    expect(na.route).toMatch(/\/workflow$/);
+    expect(na.title).toMatch(/Enrich the confirmed steps/);
+    const opened = act(state, consultant, "UPDATE_BLUEPRINT", { op: "CONFIRM_STEP", stepId: "WF-001", status: "open" });
+    expect(opened.nextHumanAction.title).toMatch(/Confirm baseline workflow steps/);
+  });
+});
+
+describe("Split blueprint generation, enrichment and citation check (stubbed model)", () => {
+  test("structure first, enrichment only on confirmed steps, citations verified against evidence", async () => {
+    const { MemoryStore, setStore, getStore } = await import("@/lib/factory/store");
+    const { ingestPack } = await import("@/lib/factory/samples");
+    const { runSpecialist, taskBrief, citedRules } = await import("@/lib/factory/specialists/runner");
+    const { runAction } = await import("@/lib/factory/service");
+    setStore(new MemoryStore());
+    const eng = "ENG-TEST-SPLIT";
+    await ingestPack("samples/krishna-industries", consultant, eng);
+    const stub = (handler: (req: { messages: { content: unknown }[] }) => Record<string, unknown>) => ({ messages: { stream: (req: { messages: { content: unknown }[] }) => ({ finalMessage: async () => ({ stop_reason: "end_turn", usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 0 }, content: [{ type: "text", text: JSON.stringify(handler(req)) }] }) }) } }) as unknown as import("@anthropic-ai/sdk").default;
+    const accept = async (requestId: string) => {
+      const rec = (await getStore().get(eng))!;
+      const p = rec.state.pendingHumanDecisions.find((x) => x.requestId === requestId)!;
+      return runAction(eng, { actionType: "DECIDE", actor: consultant, payload: { requestId, type: "ACCEPT_RECOMMENDATION", target: p.target, rationale: "ok" } });
+    };
+    // Enrichment and citation check refuse to run before there is anything to work on.
+    let state = (await getStore().get(eng))!.state;
+    expect(taskBrief("ENRICH", state).blocked).toMatch(/No confirmed steps/);
+    expect(taskBrief("CITATION_CHECK", state).blocked).toMatch(/No rule cites/);
+    const blockedRun = await runSpecialist(eng, "BLUEPRINT", consultant, "ENRICH", stub(() => ({})));
+    expect(blockedRun.status).toBe("INSUFFICIENT_CONTEXT");
+
+    // 1. Structure only.
+    const structure = {
+      summary: "Skeleton", rationale: "From evidence", confidence: "MEDIUM",
+      phases: [{ key: "request", name: "Request", desc: "" }, { key: "approve", name: "Approve", desc: "" }],
+      steps: [
+        { contractId: "WF-001", phase: "request", name: "Raise PR", owner: "Requester", lane: "plant", type: "human", purpose: "Capture need", trigger: "Need", inputs: [], systems: ["SAP"], outcome: "PR", basis: "DOCUMENTED", evidenceRefs: ["EV-001"] },
+        { contractId: "WF-002", phase: "approve", name: "Release PO", owner: "Plant Head", lane: "plant", type: "human", purpose: "DoA release", trigger: "PO", inputs: [], systems: ["SAP"], outcome: "Released PO", basis: "DOCUMENTED", evidenceRefs: ["EV-001"] },
+        { contractId: "WF-003", phase: "approve", name: "Coimbatore book in Tally", owner: "Site accountant", lane: "coimbatore", type: "human", purpose: "Side ledger", trigger: "PO", inputs: [], systems: ["Tally"], outcome: "Booked", basis: "OBSERVED", evidenceRefs: ["EV-007"] },
+      ],
+      currentAi: [], valueNorthStar: { objective: "TO_CONFIRM", primaryMetric: "TO_CONFIRM", metricDefinition: "", measurementGranularity: "", unit: "", direction: "TO_CONFIRM", startEvent: "", endEvent: "", baseline: "", target: "", owner: "", reportingCadence: "", secondaryMetrics: [] },
+      openItems: [], contradictionsNoted: [], referenceArchitecture: { status: "TO_CONFIRM", note: "", patterns: [] },
+    };
+    let seenPrompt = "";
+    const r1 = await runSpecialist(eng, "BLUEPRINT", consultant, "STRUCTURE", stub((req) => { seenPrompt = JSON.stringify(req.messages[0].content); return structure; }));
+    expect(r1.status).toBe("COMPLETE");
+    expect(seenPrompt).toMatch(/workflow skeleton/);
+    await accept(r1.requestId!);
+    state = (await getStore().get(eng))!.state;
+    let bp = getBlueprint(state)!;
+    expect(bp.steps).toHaveLength(3);
+    expect(bp.steps.every((s) => s.rules.length === 0 && s.checks.length === 0 && s.humanActions.length === 0)).toBe(true);
+    expect(bp.steps.every((s) => s.status === "open")).toBe(true);
+    expect(bp.steps[2].lane).toBe("coimbatore");
+    expect(bp.steps[2].basis).toBe("OBSERVED");
+
+    // 2. Confirm two of three steps; enrichment is scoped to those.
+    await runAction(eng, { actionType: "UPDATE_BLUEPRINT", actor: consultant, payload: { op: "CONFIRM_STEP", stepId: "WF-001" } });
+    await runAction(eng, { actionType: "UPDATE_BLUEPRINT", actor: consultant, payload: { op: "CONFIRM_STEP", stepId: "WF-002" } });
+    state = (await getStore().get(eng))!.state;
+    const brief = taskBrief("ENRICH", state);
+    expect(brief.instruction).toMatch(/WF-001/);
+    expect(brief.instruction).toMatch(/WF-002/);
+    expect(brief.instruction).not.toMatch(/WF-003 \(/);
+    const enrichment = {
+      summary: "Detail", rationale: "", confidence: "MEDIUM",
+      steps: [
+        { contractId: "WF-001", rules: [{ statement: "PR must carry a cost centre", ruleType: "Data Quality", hardStop: true, basis: "DOCUMENTED", provenance: { sourceType: "POLICY", sourceRef: "EV-001", status: "SOURCE_SUPPORTED" } }, { statement: "Requester attaches three quotes", ruleType: "Business Policy", hardStop: false, basis: "INFERRED", provenance: { sourceType: "POLICY", sourceRef: "EV-999", status: "SOURCE_SUPPORTED" } }], checks: [{ name: "Completeness", purpose: "", executionPersona: "System", executionPoint: "On submit", supportsDecisionStepIds: ["WF-002"], inputsEvidence: "", sourceSystems: "SAP", logicType: "Deterministic", expectedResult: "COMPLETE", passAction: "Route", failAction: "Return", output: "Result", writebackAction: "", authority: "System", sourceRefs: [] }], humanActions: [{ name: "Submit PR", actor: "Requester", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-002", systemImpact: "", rerunBehavior: "", auditRequirements: "" }], noHumanDecision: false, noHumanDecisionReason: "" },
+        { contractId: "WF-002", rules: [{ statement: "Plant Head releases above the Purchase Manager limit", ruleType: "Human Authority", hardStop: true, basis: "DOCUMENTED", provenance: { sourceType: "POLICY", sourceRef: "EV-001", status: "SOURCE_SUPPORTED" } }], checks: [], humanActions: [], noHumanDecision: false, noHumanDecisionReason: "" },
+        { contractId: "WF-003", rules: [{ statement: "Should not land", ruleType: "Business Policy", hardStop: false, basis: "INFERRED", provenance: { sourceType: "", sourceRef: "", status: "UNCONFIRMED" } }], checks: [], humanActions: [], noHumanDecision: false, noHumanDecisionReason: "" },
+      ],
+      openItems: [{ title: "Which DoA limits apply", detail: "", owner: "CFO office", relatedIds: ["WF-002"] }],
+    };
+    const r2 = await runSpecialist(eng, "BLUEPRINT", consultant, "ENRICH", stub(() => enrichment));
+    expect(r2.status).toBe("COMPLETE");
+    await accept(r2.requestId!);
+    state = (await getStore().get(eng))!.state;
+    bp = getBlueprint(state)!;
+    const wf1 = bp.steps.find((s) => s.contractId === "WF-001")!;
+    const wf3 = bp.steps.find((s) => s.contractId === "WF-003")!;
+    expect(wf1.status).toBe("confirmed");
+    expect(wf1.rules.map((r) => r.ruleId)).toEqual(["WF-001-R01", "WF-001-R02"]);
+    expect(wf1.checks[0].checkId).toBe("WF-001-C01");
+    expect(wf1.checks[0].reviewStatus).toBe("open");
+    expect(wf1.humanActions[0].actionId).toBe("WF-001-A01");
+    expect(wf3.rules).toHaveLength(0);
+    expect(bp.changeLog[bp.changeLog.length - 1].summary).toMatch(/skipped unconfirmed WF-003/);
+    expect(state.openItems.some((o) => /EV-999/.test(o.title))).toBe(true);
+    // WF-002 is person-owned with no action and no statement → uncovered.
+    expect(designCompletionSummary(bp).areas.find((a) => a.key === "humanDecision")!.done).toBe(1);
+
+    // 3. Citation check: unsupported → DISPUTED; unknown source → SOURCE_MISSING; human-confirmed → contested, not downgraded.
+    await runAction(eng, { actionType: "UPDATE_BLUEPRINT", actor: consultant, payload: { op: "SET_RULE", stepId: "WF-002", ruleId: "WF-002-R01", fields: { provenance: { status: "CLIENT_CONFIRMED" } } } });
+    state = (await getStore().get(eng))!.state;
+    const cited = citedRules(state);
+    expect(cited.map((r) => r.ruleId).sort()).toEqual(["WF-001-R01", "WF-001-R02", "WF-002-R01"]);
+    expect(cited.find((r) => r.ruleId === "WF-001-R02")!.sourceKnown).toBe(false);
+    const citationBrief = taskBrief("CITATION_CHECK", state);
+    expect(citationBrief.instruction).toMatch(/WF-001-R01 cites EV-001/);
+    expect(citationBrief.instruction).not.toMatch(/WF-001-R02/);
+    const verdicts = { summary: "", rationale: "", confidence: "HIGH", verdicts: [
+      { ruleId: "WF-001-R01", sourceRef: "EV-001", verdict: "SUPPORTED", quote: "cost centre is mandatory", note: "" },
+      { ruleId: "WF-002-R01", sourceRef: "EV-001", verdict: "NOT_SUPPORTED", quote: "", note: "Policy names the CFO, not the Plant Head" },
+    ] };
+    const r3 = await runSpecialist(eng, "BLUEPRINT", consultant, "CITATION_CHECK", stub(() => verdicts));
+    expect(r3.status).toBe("COMPLETE");
+    await accept(r3.requestId!);
+    state = (await getStore().get(eng))!.state;
+    bp = getBlueprint(state)!;
+    expect(bp.changeLog[bp.changeLog.length - 1].summary).toMatch(/3 rule\(s\) checked, 1 disputed, 1 supported, 1 contested/);
+    const rules = Object.fromEntries(bp.steps.flatMap((s) => s.rules).map((r) => [r.ruleId, r]));
+    expect(rules["WF-001-R01"].provenance.status).toBe("SOURCE_SUPPORTED");
+    expect(rules["WF-001-R01"].provenance.verification?.quote).toBe("cost centre is mandatory");
+    expect(rules["WF-001-R02"].provenance.status).toBe("DISPUTED");
+    expect(rules["WF-001-R02"].provenance.verification?.verdict).toBe("SOURCE_MISSING");
+    expect(rules["WF-002-R01"].provenance.status).toBe("CLIENT_CONFIRMED");
+    expect(rules["WF-002-R01"].provenance.verification?.verdict).toBe("NOT_SUPPORTED");
+    expect(state.openItems.some((o) => /contradicts 1 human-confirmed rule/.test(o.title))).toBe(true);
     setStore(null);
   });
 });

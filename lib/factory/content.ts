@@ -4,7 +4,7 @@ import type { Blueprint } from "./blueprint";
 import type { BuildContract, RepositoryRealizationPlan } from "./build";
 import type { IntegrationDataContract } from "./integration";
 import type { TransformationPlan } from "./planner";
-import type { FactoryState } from "./schema";
+import { ENTERPRISE_SECTIONS, type EnterpriseContext, type FactoryState } from "./schema";
 import type { SimulationPack } from "./simulation";
 import type { ControlledTechnicalDesign } from "./technical";
 import type { ValidationReport } from "./validator";
@@ -22,6 +22,19 @@ export const CONTENT_KEYS = {
   simulationPacks: "simulationPacks",
   experiencePack: "experiencePack",
 } as const;
+
+export function emptyEnterpriseContext(at = "1970-01-01T00:00:00.000Z"): EnterpriseContext {
+  return { reviewStatus: "EMPTY", version: 0, updatedAt: at, summary: "", architectureStandards: [], systems: [], integrationPatterns: [], dataDomains: [], securityCompliance: [], aiPolicy: [], gaps: [] };
+}
+
+/** Enterprise context with a safe default for records created before it existed. */
+export function getEnterpriseContext(s: FactoryState): EnterpriseContext {
+  return s.enterpriseContext ?? emptyEnterpriseContext(s.stateUpdatedAt);
+}
+
+export function enterpriseEntryCount(e: EnterpriseContext): number {
+  return ENTERPRISE_SECTIONS.reduce((n, k) => n + e[k].length, 0);
+}
 
 export function getBlueprint(s: FactoryState): Blueprint | undefined {
   return s.artifactContent[CONTENT_KEYS.blueprint] as Blueprint | undefined;
