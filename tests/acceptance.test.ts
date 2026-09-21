@@ -396,3 +396,58 @@ describe("Sample intake pack", () => {
     setStore(null);
   });
 });
+
+describe("Specialist output schemas", () => {
+  test("every AI specialist schema compiles to a structured-output format with the SDK helper", async () => {
+    const { zodOutputFormat } = await import("@anthropic-ai/sdk/helpers/zod");
+    const { EVIDENCE_INTAKE_CONTRACT } = await import("@/lib/factory/specialists/contracts");
+    for (const c of [...Object.values(SPECIALISTS).filter((s) => s.aiWorker), EVIDENCE_INTAKE_CONTRACT]) {
+      const f = zodOutputFormat(c.outputSchema as unknown as Parameters<typeof zodOutputFormat>[0]);
+      expect(f.type, c.id).toBe("json_schema");
+      expect(JSON.stringify(f.schema).length, c.id).toBeGreaterThan(100);
+    }
+  });
+});
+
+describe("Specialist run (stubbed model)", () => {
+  test("Blueprint specialist output lands as a recommendation that a human can accept into the working design", async () => {
+    const { MemoryStore, setStore, getStore } = await import("@/lib/factory/store");
+    const { ingestPack } = await import("@/lib/factory/samples");
+    const { runSpecialist } = await import("@/lib/factory/specialists/runner");
+    const { runAction } = await import("@/lib/factory/service");
+    setStore(new MemoryStore());
+    await ingestPack("samples/krishna-industries", consultant, "ENG-TEST-KI2");
+    const parsed_output = {
+      summary: "Six-step PR-to-PO baseline", rationale: "From policy, audit and interview notes", confidence: "MEDIUM",
+      phases: [{ key: "request", name: "Request", desc: "" }, { key: "source", name: "Source", desc: "" }, { key: "approve", name: "Approve", desc: "" }],
+      steps: [
+        { contractId: "WF-001", phase: "request", name: "Raise purchase requisition", owner: "Requester", lane: "ops", type: "mixed", purpose: "Capture need", trigger: "Need identified", inputs: ["Material code"], aiRole: "Check completeness", humanAuthority: "Requester submits", systems: ["SAP"], reads: [], writes: ["PR"], exceptions: "Incomplete PR returned", rerun: "Re-check changed fields", outcome: "Released PR", writeback: "PR in SAP", notes: "", evidenceRefs: ["EV-001"], rules: [{ statement: "PR must carry a cost centre", ruleType: "Data Quality", hardStop: true, provenance: { sourceType: "POLICY_DOCUMENT", sourceRef: "EV-001", status: "SOURCE_SUPPORTED" } }], checks: [{ name: "Completeness", purpose: "", executionPersona: "AI", executionPoint: "On submit", supportsDecisionStepIds: ["WF-002"], inputsEvidence: "", sourceSystems: "SAP", logicType: "Deterministic", expectedResult: "COMPLETE", passAction: "Route", failAction: "Return", output: "Completeness result", writebackAction: "", authority: "System", sourceRefs: [] }], humanActions: [{ name: "Submit PR", actor: "Requester", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-002", systemImpact: "", rerunBehavior: "", auditRequirements: "Actor, timestamp" }] },
+        { contractId: "WF-002", phase: "source", name: "Obtain quotations", owner: "Buyer", lane: "purchase", type: "mixed", purpose: "Three quotes above 50k", trigger: "Released PR", inputs: [], aiRole: "Draft comparative statement", humanAuthority: "Buyer signs CS", systems: ["Outlook", "Excel"], reads: [], writes: [], exceptions: "Single source needs KI-F-33", rerun: "", outcome: "Signed CS", writeback: "", notes: "", evidenceRefs: ["EV-001", "EV-007"], rules: [], checks: [], humanActions: [] },
+        { contractId: "WF-003", phase: "approve", name: "Release purchase order", owner: "Approver per DoA", lane: "approval", type: "human", purpose: "DoA release", trigger: "PO created", inputs: [], aiRole: "", humanAuthority: "Per DoA — TO_CONFIRM which limits", systems: ["SAP"], reads: [], writes: ["PO release"], exceptions: "", rerun: "", outcome: "Released PO", writeback: "", notes: "Limits contradicted", evidenceRefs: ["EV-001", "EV-002", "EV-007"], rules: [{ statement: "POs above the Purchase Manager limit need Plant Head release", ruleType: "Human Authority", hardStop: true, provenance: { sourceType: "POLICY_DOCUMENT", sourceRef: "EV-001", status: "DISPUTED" } }], checks: [], humanActions: [{ name: "Release PO", actor: "Plant Head", availableWhen: "", preconditions: "", effect: "", nextState: "RELEASED", targetStepId: "WF-003", systemImpact: "SAP release", rerunBehavior: "", auditRequirements: "SAP release log" }] },
+      ],
+      currentAi: [{ category: "Workflow automation", capability: "SAP release strategy", currentPosition: "2019 config", treatment: "EXTEND", why: "Keep release mechanics", evidenceStatus: "CURRENT_STATE_DOCUMENTED", workflowRefs: ["WF-003"] }],
+      valueNorthStar: { objective: "Reduce PR-to-PO cycle time", primaryMetric: "PR-to-PO cycle time", metricDefinition: "Days from PR release to PO release", measurementGranularity: "Per PO", unit: "days", direction: "LOWER_IS_BETTER", startEvent: "PR released", endEvent: "PO released", baseline: "TO_CONFIRM", target: "TO_CONFIRM", owner: "TO_CONFIRM", reportingCadence: "Weekly", secondaryMetrics: [] },
+      openItems: [{ title: "Which DoA is authoritative", detail: "Rev C vs April MRM", owner: "CFO office", relatedIds: ["WF-003"] }],
+      contradictionsNoted: ["approval thresholds"],
+    };
+    const stub = { messages: { parse: async () => ({ stop_reason: "end_turn", usage: { input_tokens: 12000, output_tokens: 3000, cache_read_input_tokens: 0 }, parsed_output }) } } as unknown as import("@anthropic-ai/sdk").default;
+    const r = await runSpecialist("ENG-TEST-KI2", "BLUEPRINT", consultant, "DEFAULT", stub);
+    expect(r.status).toBe("COMPLETE");
+    expect(r.requestId).toMatch(/^REQ-/);
+    let rec = (await getStore().get("ENG-TEST-KI2"))!;
+    const pending = rec.state.pendingHumanDecisions.find((p) => p.requestId === r.requestId)!;
+    expect(pending.recommendation?.source).toBe("AI_SPECIALIST");
+    expect(rec.state.authoritativeArtifacts.find((a) => a.kind === "SPECIALIST_RECOMMENDATION")?.authority).toBe("REFERENCE_ONLY");
+    expect(getBlueprint(rec.state)).toBeUndefined();
+    await runAction("ENG-TEST-KI2", { actionType: "DECIDE", actor: consultant, payload: { requestId: r.requestId, type: "ACCEPT_RECOMMENDATION", target: pending.target, rationale: "Accept as starting point" } });
+    rec = (await getStore().get("ENG-TEST-KI2"))!;
+    const bp = getBlueprint(rec.state)!;
+    expect(bp.steps).toHaveLength(3);
+    expect(bp.steps.every((s) => s.status === "open")).toBe(true);
+    expect(bp.steps[0].checks[0].checkId).toBe("WF-001-C01");
+    expect(bp.steps[0].checks[0].execution.stepId).toBe("WF-001");
+    expect(rec.state.openItems.some((o) => o.title === "Which DoA is authoritative")).toBe(true);
+    expect(rec.state.valueNorthStar.reviewStatus).toBe("OPEN");
+    setStore(null);
+  });
+});

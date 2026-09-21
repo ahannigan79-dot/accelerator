@@ -7,7 +7,6 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import type { z } from "zod";
 import { runAction } from "../service";
 import type { Actor, FactoryState, TargetObject } from "../schema";
 import { compileContext, type ContextManifest } from "./context";
@@ -83,7 +82,8 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
   const anthropic = client ?? new Anthropic();
   const started = Date.now();
   try {
-    const schema = contract.outputSchema as z.ZodTypeAny;
+    // The SDK helper runs on the Zod v4 runtime but its type declarations reference the v3 ZodType, so the cast bridges the two.
+    const schema = contract.outputSchema as unknown as Parameters<typeof zodOutputFormat>[0];
     const response = await anthropic.messages.parse({
       model: process.env.FACTORY_MODEL || DEFAULT_MODEL,
       max_tokens: 32000,

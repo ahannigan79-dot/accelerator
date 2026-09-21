@@ -4,7 +4,7 @@
  * the Control Plane routes; humans decide.
  */
 
-import { z } from "zod";
+import { z } from "zod/v4";
 import type { LifecycleStage } from "../schema";
 
 export const SPECIALIST_IDS = [
