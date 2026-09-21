@@ -73,24 +73,38 @@ function toRecommendation(contract: SpecialistContract, parsed: Record<string, u
  * Run a specialist end to end. Uses the Governed Action API for every state change:
  * QUEUE_JOB → START_JOB → (model call) → COMPLETE_JOB with recommendation, or FAIL_JOB.
  */
-export async function runSpecialist(engagementId: string, specialistId: SpecialistId, actor: Actor, task = "DEFAULT", client?: Anthropic): Promise<SpecialistRunResult> {
+export interface QueuedSpecialist {
+  jobId: string;
+  manifest: ContextManifest;
+  /** Set when the job was failed at queue time (insufficient context, no AI credentials). */
+  earlyResult?: SpecialistRunResult;
+}
+
+/** Phase 1: queue the job, compile the Context Manifest, and fail fast when the run cannot proceed. Returns quickly. */
+export async function queueSpecialist(engagementId: string, specialistId: SpecialistId, actor: Actor, task = "DEFAULT", client?: Anthropic): Promise<QueuedSpecialist> {
   const contract = contractFor(specialistId, task);
   if (!contract.aiWorker) throw new Error(`${specialistId} is a deterministic service, not an AI worker`);
   const queued = await runAction(engagementId, { actionType: "QUEUE_JOB", actor, payload: { jobType: "SPECIALIST_RUN", specialistId } });
   const jobId = String(queued.data?.jobId);
-  const state = queued.state;
-  const manifest = compileContext(state, contract, actor, `${specialistId}:${task}`, queued.runtime.projection_of_state_revision);
+  const manifest = compileContext(queued.state, contract, actor, `${specialistId}:${task}`, queued.runtime.projection_of_state_revision);
   const telemetry = { modelCalls: 0, inputTokens: 0, outputTokens: 0, latencyMs: 0, retries: 0, cacheReadTokens: 0 };
   if (manifest.sufficiency === "INSUFFICIENT" || manifest.sufficiency === "STALE") {
     await runAction(engagementId, { actionType: "FAIL_JOB", actor, payload: { jobId, error: `Context ${manifest.sufficiency}: ${manifest.sufficiencyDetail}` } });
-    return { jobId, status: "INSUFFICIENT_CONTEXT", manifest, error: manifest.sufficiencyDetail, telemetry };
+    return { jobId, manifest, earlyResult: { jobId, status: "INSUFFICIENT_CONTEXT", manifest, error: manifest.sufficiencyDetail, telemetry } };
   }
   if (!client && !aiAvailable()) {
     await runAction(engagementId, { actionType: "FAIL_JOB", actor, payload: { jobId, error: "AI worker unavailable: no Anthropic credentials configured. Deterministic controls and human decisions continue to operate." } });
-    return { jobId, status: "FAILED", manifest, error: "AI worker unavailable", telemetry };
+    return { jobId, manifest, earlyResult: { jobId, status: "FAILED", manifest, error: "AI worker unavailable", telemetry } };
   }
-  await runAction(engagementId, { actionType: "START_JOB", actor, payload: { jobId } });
-  // Long structured outputs can take several minutes; keep the SDK timeout under the route limit so a slow run fails as a job, not a 504.
+  return { jobId, manifest };
+}
+
+/** Phase 2: the long model call. Runs after the HTTP response has been sent; every outcome is recorded on the job. */
+export async function executeSpecialist(engagementId: string, jobId: string, manifest: ContextManifest, specialistId: SpecialistId, actor: Actor, task = "DEFAULT", client?: Anthropic): Promise<SpecialistRunResult> {
+  const contract = contractFor(specialistId, task);
+  const telemetry = { modelCalls: 0, inputTokens: 0, outputTokens: 0, latencyMs: 0, retries: 0, cacheReadTokens: 0 };
+  const startedRun = await runAction(engagementId, { actionType: "START_JOB", actor, payload: { jobId } });
+  const state = startedRun.state;
   const anthropic = client ?? new Anthropic({ maxRetries: 1 });
   const started = Date.now();
   try {
@@ -143,4 +157,11 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
     await runAction(engagementId, { actionType: "FAIL_JOB", actor, payload: { jobId, error: message } });
     return { jobId, status: "FAILED", manifest, error: message, telemetry };
   }
+}
+
+/** Queue and execute in one call. Used by tests and scripts; the HTTP route splits the phases so the response never waits on the model. */
+export async function runSpecialist(engagementId: string, specialistId: SpecialistId, actor: Actor, task = "DEFAULT", client?: Anthropic): Promise<SpecialistRunResult> {
+  const q = await queueSpecialist(engagementId, specialistId, actor, task, client);
+  if (q.earlyResult) return q.earlyResult;
+  return executeSpecialist(engagementId, q.jobId, q.manifest, specialistId, actor, task, client);
 }

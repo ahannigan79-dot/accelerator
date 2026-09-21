@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Badge, KV, Panel, StatusBadge, fmtDate } from "@/components/ui";
 import { getBlueprint } from "@/lib/factory/content";
 import { getStore } from "@/lib/factory/store";
+import { JobControls } from "./job-controls";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,7 @@ export default async function Lineage({ params }: { params: Promise<{ id: string
             {state.jobs.length ? (
               <table className="table"><tbody>
                 {[...state.jobs].reverse().map((j) => (
-                  <tr key={j.jobId}><td><b>{j.jobId}</b> {j.jobType.replaceAll("_", " ").toLowerCase()}{j.specialistId ? ` · ${j.specialistId}` : ""}<div className="small muted">{j.batch.completed}/{j.batch.total} · src rev {j.sourceStateRevision}{j.error ? ` · ${j.error}` : ""}{j.telemetry.modelCalls ? ` · ${j.telemetry.modelCalls} call(s) · ${j.telemetry.inputTokens}/${j.telemetry.outputTokens} tok · ${j.telemetry.latencyMs} ms` : ""}</div></td><td><StatusBadge value={j.status} /></td></tr>
+                  <tr key={j.jobId}><td><b>{j.jobId}</b> {j.jobType.replaceAll("_", " ").toLowerCase()}{j.specialistId ? ` · ${j.specialistId}` : ""}<div className="small muted">{j.batch.completed}/{j.batch.total} · src rev {j.sourceStateRevision} · {fmtDate(j.updatedAt)}{j.error ? ` · ${j.error}` : ""}{j.telemetry.modelCalls ? ` · ${j.telemetry.modelCalls} call(s) · ${j.telemetry.inputTokens}/${j.telemetry.outputTokens} tok · ${Math.round(j.telemetry.latencyMs / 1000)} s` : ""}</div><JobControls job={{ jobId: j.jobId, status: j.status, jobType: j.jobType, updatedAt: j.updatedAt }} /></td><td><StatusBadge value={j.status} /></td></tr>
                 ))}
               </tbody></table>
             ) : <p className="small muted">No jobs.</p>}

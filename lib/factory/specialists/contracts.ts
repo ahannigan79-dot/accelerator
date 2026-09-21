@@ -41,7 +41,8 @@ const GOVERNANCE = `You are one specialist inside a governed AI delivery factory
 1. You interpret evidence, gaps, relevance and recommendations. You never approve anything.
 2. Deterministic controls compute gate outcomes from recorded state and evidence. Nothing you write changes a gate.
 3. Authorized humans approve, reject, correct, waive and select paths. Your output is a recommendation they will review.
-Work only from the Context Manifest you are given. It is the authoritative context for exactly one engagement. Do not draw on facts about other clients or engagements. Never invent evidence; when something is unknown write TO_CONFIRM and raise it as an open item. Never present synthetic or simulated material as real proof. Keep client facts inside this engagement.`;
+Work only from the Context Manifest you are given. It is the authoritative context for exactly one engagement. Do not draw on facts about other clients or engagements. Never invent evidence; when something is unknown write TO_CONFIRM and raise it as an open item. Never present synthetic or simulated material as real proof. Keep client facts inside this engagement.
+Be economical: this output is a working draft that humans will refine. Keep every free-text field to one or two sentences, do not repeat evidence verbatim, and prefer fewer well-founded items over exhaustive lists.`;
 
 const ruleSchema = z.object({ statement: z.string(), ruleType: z.enum(["Business Policy", "Deterministic", "Regulatory", "Human Authority", "Data Quality"]), hardStop: z.boolean(), provenance: z.object({ sourceType: z.string(), sourceRef: z.string(), status: z.enum(["UNCONFIRMED", "CLIENT_CONFIRMED", "SOURCE_SUPPORTED", "VERIFIED", "DISPUTED"]) }) });
 const checkSchema = z.object({ name: z.string(), purpose: z.string(), executionPersona: z.string(), executionPoint: z.string(), supportsDecisionStepIds: z.array(z.string()), inputsEvidence: z.string(), sourceSystems: z.string(), logicType: z.enum(["Deterministic", "AI-assisted", "Human judgment", "Hybrid"]), expectedResult: z.string(), passAction: z.string(), failAction: z.string(), output: z.string(), writebackAction: z.string(), authority: z.string(), sourceRefs: z.array(z.string()) });
@@ -157,7 +158,8 @@ export const SPECIALISTS: Record<SpecialistId, SpecialistContract> = {
 You are the Blueprint specialist. Reconstruct the workflow from the evidence supplied. Produce stable step IDs WF-001, WF-002 ... in execution order, grouped into phases. For every step give the AI role, the human authority, systems, reads, writes, exceptions, rerun behaviour and the correlated outcome.
 Rules carry provenance: cite the evidenceRef that supports each rule, or mark it UNCONFIRMED. Checks are prepared at one execution step and consumed by later decision steps (supportsDecisionStepIds) — keep these distinct. Human actions are first-class objects with actor, preconditions, effect and next state.
 In BASELINE mode describe the current state only. In TARGET mode with AI_NATIVE_REIMAGINED you may restructure, but keep every baseline rule unless evidence says it changed, and mark the treatment of existing capability (KEEP/REUSE/EXTEND/...).
-Value North Star: propose the primary measurable outcome from evidence; leave fields TO_CONFIRM when unsupported. Raise every unknown as an open item. Do not claim anything is approved.`,
+Value North Star: propose the primary measurable outcome from evidence; leave fields TO_CONFIRM when unsupported. Raise every unknown as an open item. Do not claim anything is approved.
+Size: aim for 6 to 12 steps, at most 3 rules, 2 checks and 2 human actions per step, and at most 8 open items. The whole response should stay under roughly 12,000 tokens.`,
   },
   INTEGRATION_READINESS: {
     id: "INTEGRATION_READINESS",
