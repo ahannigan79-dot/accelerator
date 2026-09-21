@@ -446,7 +446,8 @@ describe("Specialist run (stubbed model)", () => {
       currentAi: [{ category: "Workflow automation", capability: "SAP release strategy", currentPosition: "2019 config", treatment: "EXTEND", why: "Keep release mechanics", evidenceStatus: "CURRENT_STATE_DOCUMENTED", workflowRefs: ["WF-003"] }],
       valueNorthStar: { objective: "Reduce PR-to-PO cycle time", primaryMetric: "PR-to-PO cycle time", metricDefinition: "Days from PR release to PO release", measurementGranularity: "Per PO", unit: "days", direction: "LOWER_IS_BETTER", startEvent: "PR released", endEvent: "PO released", baseline: "TO_CONFIRM", target: "TO_CONFIRM", owner: "TO_CONFIRM", reportingCadence: "Weekly", secondaryMetrics: [] },
       openItems: [{ title: "Which DoA is authoritative", detail: "Rev C vs April MRM", owner: "CFO office", relatedIds: ["WF-003"] }],
-      contradictionsNoted: ["approval thresholds"],
+      contradictionsNoted: ["Policy says 1L/5L/25L but the April MRM email says 3L/10L/50L"],
+      referenceArchitecture: { status: "CURRENT_STATE_DOCUMENTED", note: "SAP ECC on-prem; Tally at Coimbatore", patterns: ["No SAP–Tally interface", "Dead vendor portal"] },
     };
     let calls = 0;
     const stub = { messages: { stream: (req: { output_config?: unknown; messages: unknown[] }) => ({ finalMessage: async () => {
@@ -475,7 +476,11 @@ describe("Specialist run (stubbed model)", () => {
     expect(bp.steps[0].checks[0].checkId).toBe("WF-001-C01");
     expect(bp.steps[0].checks[0].execution.stepId).toBe("WF-001");
     expect(rec.state.openItems.some((o) => o.title === "Which DoA is authoritative")).toBe(true);
+    expect(rec.state.openItems.some((o) => o.kind === "QUESTION" && /Specialist noted a contradiction/.test(o.title))).toBe(true);
     expect(rec.state.valueNorthStar.reviewStatus).toBe("OPEN");
+    expect(rec.state.valueNorthStar.primaryMetric).toBe("PR-to-PO cycle time");
+    expect(bp.valueNorthStar.primaryMetric).toBe("PR-to-PO cycle time");
+    expect(bp.referenceArchitecture.patterns).toContain("Dead vendor portal");
     setStore(null);
   });
 });

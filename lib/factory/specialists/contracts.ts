@@ -83,6 +83,7 @@ export const BlueprintOutput = z.object({
   valueNorthStar: z.object({ objective: z.string(), primaryMetric: z.string(), metricDefinition: z.string(), measurementGranularity: z.string(), unit: z.string(), direction: z.enum(["LOWER_IS_BETTER", "HIGHER_IS_BETTER", "TO_CONFIRM"]), startEvent: z.string(), endEvent: z.string(), baseline: z.string(), target: z.string(), owner: z.string(), reportingCadence: z.string(), secondaryMetrics: z.array(z.string()) }),
   openItems: z.array(z.object({ title: z.string(), detail: z.string(), owner: z.string(), relatedIds: z.array(z.string()) })),
   contradictionsNoted: z.array(z.string()),
+  referenceArchitecture: z.object({ status: z.enum(["CURRENT_STATE_DOCUMENTED", "CLIENT_STATED", "TO_CONFIRM"]), note: z.string(), patterns: z.array(z.string()) }).describe("Current-state system landscape as evidenced: systems, integrations, notable absences"),
 });
 
 export const IntegrationOutput = z.object({

@@ -1217,7 +1217,21 @@ function applyRecommendationPayload(ctx: Ctx, rec: Recommendation, draft: Record
     if (!currentArtifact(s, "WORKFLOW_BLUEPRINT")) registerArtifact(s, { kind: "WORKFLOW_BLUEPRINT", title: `${normalized.mode === "BASELINE" ? "Baseline" : "Target"} Workflow Blueprint`, version: normalized.version, producedBy: "AI_SPECIALIST", specialistId: rec.specialistId, contentKey: CONTENT_KEYS.blueprint, summary: `Accepted from ${rec.recommendationRef}` }, ctx.at);
     else currentArtifact(s, "WORKFLOW_BLUEPRINT")!.version = normalized.version;
     if (draft.valueNorthStar && s.valueNorthStar.reviewStatus !== "CONFIRMED") s.valueNorthStar = { ...s.valueNorthStar, ...(draft.valueNorthStar as Partial<FactoryState["valueNorthStar"]>), reviewStatus: "OPEN" };
+    normalized.valueNorthStar = s.valueNorthStar;
+    if (draft.referenceArchitecture && typeof draft.referenceArchitecture === "object") normalized.referenceArchitecture = { ...normalized.referenceArchitecture, ...(draft.referenceArchitecture as Blueprint["referenceArchitecture"]) };
+    s.artifactContent[CONTENT_KEYS.blueprint] = normalized;
     if (Array.isArray(draft.openItems)) for (const o of draft.openItems as { title: string; detail: string; owner?: string; relatedIds?: string[] }[]) s.openItems.push({ itemId: nextId(s, "TC"), kind: "TO_CONFIRM", title: o.title, detail: o.detail, owner: o.owner ?? "TO_CONFIRM", stage: s.currentStage, relatedIds: o.relatedIds ?? [], status: "OPEN", raisedAt: ctx.at });
+    // Contradictions the specialist noticed in prose become open questions; the deterministic engine only sees structured claims.
+    if (Array.isArray(draft.contradictionsNoted)) for (const c of draft.contradictionsNoted as string[]) if (c.trim()) s.openItems.push({ itemId: nextId(s, "OPN"), kind: "QUESTION", title: `Specialist noted a contradiction: ${c.slice(0, 80)}`, detail: c, owner: "Consultant", stage: s.currentStage, relatedIds: [], status: "OPEN", raisedAt: ctx.at });
+    // Evidence references the specialist cited must exist in this engagement's catalog; unknown ones are flagged rather than trusted.
+    const known = new Set(s.evidenceCatalog.map((e) => e.evidenceRef));
+    const unknownRefs = new Set<string>();
+    for (const st of normalized.steps) {
+      st.evidenceRefs.filter((r) => !known.has(r)).forEach((r) => unknownRefs.add(r));
+      st.rules.forEach((r) => { if (r.provenance.sourceRef && /^EV-/.test(r.provenance.sourceRef) && !known.has(r.provenance.sourceRef)) unknownRefs.add(r.provenance.sourceRef); });
+      st.checks.forEach((c) => c.sourceRefs.filter((r) => !known.has(r)).forEach((r) => unknownRefs.add(r)));
+    }
+    if (unknownRefs.size) s.openItems.push({ itemId: nextId(s, "OPN"), kind: "QUESTION", title: `Draft cites evidence not in the catalog: ${[...unknownRefs].join(", ")}`, detail: "The specialist referenced evidence IDs that do not exist in this engagement. Treat the affected rules and checks as unsupported until re-linked.", owner: "Consultant", stage: s.currentStage, relatedIds: [...unknownRefs], status: "OPEN", raisedAt: ctx.at });
     touchStageExecution(ctx, "IN_PROGRESS");
     ctx.events.push({ type: "WORKFLOW_CHANGED", summary: `Blueprint v${normalized.version} accepted from AI recommendation; all items open for human review` });
   } else if (kind === "INTEGRATION_CONTRACT") {
