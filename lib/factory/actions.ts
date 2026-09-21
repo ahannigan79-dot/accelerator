@@ -118,6 +118,7 @@ export class ActionError extends Error {
   }
 }
 
+const MAX_EVIDENCE_CONTENT = 60_000;
 const CONSULTANT: ActorRole[] = ["CONSULTANT", "DELIVERY_LEAD"];
 const ANY_HUMAN: ActorRole[] = ["CONSULTANT", "DELIVERY_LEAD", "CLIENT_BUSINESS_OWNER", "CLIENT_PROCESS_OWNER", "CLIENT_ARCHITECT", "ARB", "SECURITY_PRIVACY", "CLIENT_IT_OPERATIONS"];
 const CONTROL_PLANE: ActorRole[] = [...ANY_HUMAN, "AI_SPECIALIST"];
@@ -268,6 +269,8 @@ const handlers: Record<ActionType, (ctx: Ctx) => void> = {
         scope: r.scope ?? "WORKFLOW",
         claims: Array.isArray(r.claims) ? r.claims : [],
         summary: r.summary ?? "",
+        content: typeof r.content === "string" && r.content.trim() ? r.content.slice(0, MAX_EVIDENCE_CONTENT) : undefined,
+        fileName: typeof r.fileName === "string" ? r.fileName : undefined,
       };
       const v = verifyEvidenceIdentity(s, rec);
       if (!v.accepted) {

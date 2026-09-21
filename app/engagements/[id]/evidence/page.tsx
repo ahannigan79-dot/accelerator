@@ -92,6 +92,12 @@ export default async function Evidence({ params }: { params: Promise<{ id: strin
                         <div className="small muted">
                           {e.summary} {e.quarantineReason ? <span style={{ color: "var(--red)" }}>· {e.quarantineReason}</span> : null}
                         </div>
+                        {e.content ? (
+                          <details className="small">
+                            <summary style={{ cursor: "pointer", color: "var(--accent)" }}>{e.fileName ?? "source"} · {e.content.length.toLocaleString()} chars</summary>
+                            <pre style={{ maxHeight: 260, marginTop: 4 }}>{e.content.slice(0, 6000)}{e.content.length > 6000 ? "\n…" : ""}</pre>
+                          </details>
+                        ) : null}
                         {e.claims.length ? (
                           <div className="small">
                             {e.claims.map((c) => (

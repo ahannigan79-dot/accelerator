@@ -191,6 +191,9 @@ export interface EvidenceRecord {
   summary: string;
   /** Set when the record was quarantined for belonging to another engagement. */
   quarantineReason?: string;
+  /** Raw text body of the source material (bounded). Read by humans and by specialists via the Context Manifest. */
+  content?: string;
+  fileName?: string;
 }
 
 export interface EvidenceRequirement {

@@ -1,0 +1,48 @@
+From: Priya Nair <priya.nair@krishnaind.example>
+Sent: Thursday, 14 August 2025 18:42
+To: Ravi Menon; Suresh Iyer; Deepak Sharma (CFO office)
+Cc: Anjali Kulkarni; purchase.pune
+Subject: RE: RE: FW: urgent - PO approvals stuck again
+
+Ravi — as discussed on the call, the limits we are ACTUALLY using since April are:
+ - up to 3 lakh : Purchase Manager
+ - 3 to 10 lakh : Plant Head
+ - 10 to 50 lakh : CFO
+ - above 50 lakh : MD
+This was agreed in the April MRM (minutes attached - actually not attached, will find) but the SAP release strategy was never changed so anything between 1L and 3L is still going to Plant Head in SAP and sitting there for days. That's why the team is doing the "approve on WhatsApp then release in SAP later" thing which audit is going to flag again.
+
+Also Deepak's point — Coimbatore is not in SAP at all so none of this applies there, Murugan approves on the paper form and someone types it into Tally at month end.
+
+Can we please just get the release strategy updated. IT says they need a "change request with business sign-off". Who signs off?? The Head of SC position is still vacant.
+
+Priya
+
+-----Original Message-----
+From: Ravi Menon
+Sent: Thursday, 14 August 2025 15:10
+To: Priya Nair; Suresh Iyer
+Subject: RE: FW: urgent - PO approvals stuck again
+
+Priya, which policy are we following, rev C says 1L / 5L / 25L. Rev D was never approved.
+Also 3 quotes rule — we have 40+ POs this quarter with single quote and no KI-F-33. Mostly bearings and seals from Sundaram Bearings because they are the only ones who deliver in 2 days. Is that "OEM spare"? I don't think so.
+
+R
+
+-----Original Message-----
+From: Suresh Iyer
+Sent: Thursday, 14 August 2025 11:03
+To: Ravi Menon; Priya Nair
+Subject: FW: urgent - PO approvals stuck again
+
+fyi. 3rd time this month. Line 2 was down for 6 hrs yesterday waiting for a Rs 1.8L PO for a gearbox that was sitting with Mr Joshi for release. Mr Joshi was travelling.
+We ended up doing emergency purchase on Anjali's personal card and will regularise. (7.1 in the policy allows verbal but Joshi wasn't reachable so technically not even that)
+
+-----Original Message-----
+From: Anjali Kulkarni
+Sent: Wednesday, 13 August 2025 21:47
+To: Suresh Iyer
+Subject: urgent - PO approvals stuck again
+
+Suresh sir, PO 4500118823 (gearbox for Line 2) stuck in release since Monday. Maintenance is shouting. Can you call Joshi sir?
+Also FYI the vendor (Precision Gears Pune) is not in AVL yet, Finance has not verified bank details, I raised the PO on the old vendor code for "Precision Gear Works" which I think is the same company after they changed name. Hope that's ok.
+Anjali

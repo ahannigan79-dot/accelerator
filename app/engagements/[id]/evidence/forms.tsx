@@ -9,7 +9,16 @@ import { EVIDENCE_TYPES } from "@/lib/factory/schema";
 const SOURCE_CLASSES = ["CLIENT_AUTHORITATIVE", "CLIENT_INFORMAL", "CONSULTANT_OBSERVATION", "SYSTEM_OF_RECORD", "SYNTHETIC_SIMULATION", "THIRD_PARTY"];
 
 export function EvidenceForms({ requirements, contradictions }: { requirements: { requirementId: string; description: string }[]; contradictions: { contradictionId: string; description: string; evidenceRefs: string[] }[] }) {
-  const [f, setF] = useState({ title: "", summary: "", evidenceType: "PROCESS_DOCUMENT", sourceClass: "CLIENT_AUTHORITATIVE", scope: "WORKFLOW", environment: "NONE", synthetic: false, requirementIds: [] as string[], claims: "" });
+  const [f, setF] = useState({ title: "", summary: "", evidenceType: "PROCESS_DOCUMENT", sourceClass: "CLIENT_AUTHORITATIVE", scope: "WORKFLOW", environment: "NONE", synthetic: false, requirementIds: [] as string[], claims: "", content: "", fileName: "" });
+  const [batch, setBatch] = useState<{ fileName: string; content: string }[]>([]);
+  const guessType = (name: string) => (/\.csv$|export|dump/i.test(name) ? "SYSTEM_EXPORT" : /policy|doa|matrix/i.test(name) ? "POLICY_DOCUMENT" : /notes|call|interview|whatsapp|chat|\.eml/i.test(name) ? "INTERVIEW_NOTES" : /landscape|architecture|system/i.test(name) ? "ARCHITECTURE_DOCUMENT" : "PROCESS_DOCUMENT");
+  async function readFiles(list: FileList | null) {
+    if (!list) return;
+    const out: { fileName: string; content: string }[] = [];
+    for (const file of Array.from(list)) out.push({ fileName: file.name, content: await file.text() });
+    if (out.length === 1) setF({ ...f, title: f.title || out[0].fileName.replace(/\.[a-z0-9]+$/i, ""), fileName: out[0].fileName, content: out[0].content, evidenceType: guessType(out[0].fileName) });
+    else setBatch(out);
+  }
   const [res, setRes] = useState<{ contradictionId: string; resolution: string; supersede: string }>({ contradictionId: contradictions[0]?.contradictionId ?? "", resolution: "", supersede: "" });
   const claims = f.claims
     .split(/[\n,]+/)
@@ -73,6 +82,24 @@ export function EvidenceForms({ requirements, contradictions }: { requirements: 
             </select>
           </div>
           <div className="field">
+            <label>Source file(s) — text, CSV, Markdown, email exports</label>
+            <input type="file" multiple accept=".txt,.csv,.md,.json,.eml,.log,text/*" onChange={(e) => readFiles(e.target.files)} />
+            {f.fileName ? <span className="small muted">{f.fileName} · {f.content.length.toLocaleString()} chars attached</span> : null}
+            {batch.length ? (
+              <div className="note" style={{ marginTop: 4 }}>
+                {batch.length} files staged as separate records (type guessed from name; edit later):
+                <ul className="list">{batch.map((b) => <li key={b.fileName}>{b.fileName} · {guessType(b.fileName).toLowerCase()} · {b.content.length.toLocaleString()} chars</li>)}</ul>
+                <ActionButton actionType="UPLOAD_EVIDENCE" variant="primary" payload={{ records: batch.map((b) => ({ title: b.fileName.replace(/\.[a-z0-9]+$/i, ""), fileName: b.fileName, content: b.content, evidenceType: guessType(b.fileName), sourceClass: f.sourceClass, scope: f.scope, environment: f.environment, requirementIds: f.requirementIds, claims: [] })) }} onDone={(r) => r.ok && setBatch([])}>
+                  Ingest {batch.length} records
+                </ActionButton>
+              </div>
+            ) : null}
+          </div>
+          <div className="field">
+            <label>Content (paste raw text, or leave empty when a file is attached)</label>
+            <textarea value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })} style={{ minHeight: 60, fontFamily: "var(--mono)", fontSize: 11 }} />
+          </div>
+          <div className="field">
             <label>Machine-readable claims (key=value, one per line)</label>
             <textarea value={f.claims} onChange={(e) => setF({ ...f, claims: e.target.value })} placeholder={"approval_threshold=15000\nprocedure_revision=Rev5"} />
           </div>
@@ -80,7 +107,7 @@ export function EvidenceForms({ requirements, contradictions }: { requirements: 
             <input type="checkbox" checked={f.synthetic} onChange={(e) => setF({ ...f, synthetic: e.target.checked })} /> Synthetic / mock (never satisfies real-evidence requirements)
           </label>
           <div className="row">
-            <ActionButton actionType="UPLOAD_EVIDENCE" variant="primary" disabled={!f.title.trim()} payload={{ records: [{ ...f, claims }] }} onDone={(r) => r.ok && setF({ ...f, title: "", summary: "", claims: "" })}>
+            <ActionButton actionType="UPLOAD_EVIDENCE" variant="primary" disabled={!f.title.trim()} payload={{ records: [{ ...f, claims }] }} onDone={(r) => r.ok && setF({ ...f, title: "", summary: "", claims: "", content: "", fileName: "" })}>
               Ingest record
             </ActionButton>
             <ActionButton actionType="ASSESS_EVIDENCE">Reassess</ActionButton>

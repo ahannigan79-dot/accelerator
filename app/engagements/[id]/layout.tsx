@@ -25,7 +25,7 @@ export default async function EngagementLayout({ children, params }: { children:
               AI Delivery Factory
             </Link>
             <span className="sub">
-              {state.engagementSetup.clientName} · {state.engagementSetup.engagementName} · <code style={{ color: "#cfe3e6" }}>{state.engagement_id}</code>
+              {state.engagementSetup.clientName} · {state.engagementSetup.engagementName} · <code style={{ color: "#b9ddff" }}>{state.engagement_id}</code>
             </span>
           </div>
           <div className="row">

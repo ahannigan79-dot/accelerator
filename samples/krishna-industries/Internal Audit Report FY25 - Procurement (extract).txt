@@ -1,0 +1,26 @@
+KRISHNA INDUSTRIES PVT LTD — INTERNAL AUDIT
+Audit: Procure-to-Pay, Pune Works & Coimbatore Plant
+Period: FY 2024-25   Report date: 12-Jun-2025   Auditor: [external firm, name redacted]   Rating: NEEDS IMPROVEMENT
+
+Observations (extract, ratings H/M/L):
+
+IA-25-01 (H) DoA not enforced in system. SAP release strategy reflects limits of Rs 1L/5L/25L per KI-PROC-004 Rev C. Management states revised limits (3L/10L/50L) were approved in April 2025 MRM; no board resolution or policy revision evidenced. 27 POs between Rs 1L–3L were released by Purchase Manager via "manual release" (SAP transaction ME29N with override reason "MRM approval") without Plant Head release.
+Mgmt response: Policy Rev D to be approved by Sep 2025. SAP change request raised. Owner: Head of SC (vacant) → interim CFO.
+
+IA-25-02 (H) Approvals evidenced outside system. Sample of 40 POs: 14 had approval evidence only as WhatsApp screenshots attached to the PO. WhatsApp approvals are not attributable, not retained per records policy.
+Mgmt response: Agreed. Will stop once SAP release strategy is fixed.
+
+IA-25-03 (M) Three-quotation rule. 46 of 120 sampled POs above Rs 50,000 had a single quotation with no KI-F-33 single-source justification on file. Concentrated in bearings/spares (vendor 100234) and hydraulics (100905).
+Mgmt response: Repeat purchases considered "rate contract" by Purchase; auditor notes rate contracts expired Mar-2023.
+
+IA-25-04 (M) Vendor master hygiene. 900 active vendors; 212 with missing GSTIN or PAN; 3 duplicate vendors identified (same GSTIN); one-time vendor account (100999) used for 43 transactions totalling Rs 9.1L. MSME flag maintained for ~11% of vendors; MSMED Act 45-day compliance cannot be demonstrated.
+Mgmt response: Vendor master clean-up project. No owner assigned.
+
+IA-25-05 (M) Coimbatore plant outside ERP. Purchases recorded in Tally at month end from paper PRs (KI-F-22). No system release; approvals are physical signatures. 2 of 15 sampled paper PRs could not be located.
+Mgmt response: SAP rollout to Coimbatore "under evaluation" since FY22.
+
+IA-25-06 (L) Services GRN timing. Service entry sheets created after invoice receipt in 31% of sampled cases, defeating 3-way match.
+
+IA-25-07 (L) PO splitting. 4 instances of PRs split into 2 POs on the same day below Rs 1L each to the same vendor (e.g. 4500118203/118204 appear to be duplicates rather than splits — to be confirmed).
+
+Repeat observations from FY24: IA-25-01, IA-25-03, IA-25-04 (third consecutive year).

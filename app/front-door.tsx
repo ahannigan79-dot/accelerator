@@ -30,6 +30,16 @@ export function FrontDoorActions({ hasEngagements }: { hasEngagements: boolean }
     router.push(`/engagements/${json.engagementId}`);
     router.refresh();
   }
+  async function loadSample(pack: string) {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/samples/${pack}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const json = await res.json();
+    setBusy(false);
+    if (!json.ok) return setError(json.error ?? "Failed");
+    router.push(`/engagements/${json.engagementId}/evidence`);
+    router.refresh();
+  }
   async function cont() {
     setBusy(true);
     setError(null);
@@ -133,6 +143,12 @@ export function FrontDoorActions({ hasEngagements }: { hasEngagements: boolean }
             {s.replaceAll("_", " ").toLowerCase()}
           </button>
         ))}
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <span className="small muted">Messy intake pack (fictional client, raw documents ingested as evidence):</span>
+        <button className="btn sm secondary" disabled={busy} onClick={() => loadSample("krishna-industries")}>
+          Load Krishna Industries · procure-to-pay
+        </button>
       </div>
       {error ? (
         <div className="note danger" style={{ marginTop: 10 }}>

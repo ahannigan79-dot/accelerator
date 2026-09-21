@@ -1,29 +1,30 @@
 :root {
-  --bg: #f4f6f8;
+  --bg: #f5f7fa;
   --surface: #ffffff;
-  --surface-2: #f9fafb;
-  --ink: #16202b;
-  --ink-2: #4b5866;
-  --muted: #74808d;
-  --line: #dde3ea;
-  --line-2: #e9edf2;
-  --accent: #0f6f6b;
+  --surface-2: #f8fbff;
+  --ink: #17233b;
+  --ink-2: #31445f;
+  --muted: #66758a;
+  --line: #dbe2ec;
+  --line-2: #e8edf3;
+  --accent: #0050c8;
   --accent-ink: #ffffff;
-  --accent-soft: #e4f2f1;
-  --deep: #12303a;
-  --deep-2: #1d4a53;
-  --green: #1c7a4c;
-  --green-soft: #e6f4ec;
-  --amber: #9a6400;
-  --amber-soft: #fff3dc;
-  --red: #b23a3a;
-  --red-soft: #fdeaea;
-  --purple: #5a4a9a;
-  --purple-soft: #eeeaf9;
-  --blue: #245a8f;
-  --blue-soft: #e8f0fa;
-  --shadow: 0 10px 28px rgba(18, 48, 58, 0.08);
-  --radius: 8px;
+  --accent-soft: #eaf2ff;
+  --deep: #071a35;
+  --deep-2: #0b2d59;
+  --green: #167653;
+  --green-soft: #e8f4ef;
+  --amber: #a96800;
+  --amber-soft: #fff2dd;
+  --red: #b94343;
+  --red-soft: #fdebec;
+  --purple: #6450a2;
+  --purple-soft: #efeafa;
+  --blue: #24518d;
+  --blue-soft: #eaf2ff;
+  --cyan: #22b8cf;
+  --shadow: 0 12px 30px rgba(8, 35, 81, 0.08);
+  --radius: 6px;
   --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -100,7 +101,7 @@ pre {
   flex-direction: column;
 }
 .topbar {
-  background: linear-gradient(118deg, var(--deep) 0%, var(--deep-2) 60%, var(--accent) 100%);
+  background: linear-gradient(118deg, var(--deep) 0%, var(--deep-2) 52%, var(--accent) 100%);
   color: #fff;
   padding: 14px 24px;
   display: flex;
@@ -124,7 +125,7 @@ pre {
 }
 .brand .sub {
   font-size: 12px;
-  color: #cfe3e6;
+  color: #b9ddff;
 }
 .chips {
   display: flex;
@@ -205,7 +206,7 @@ pre {
 }
 .stage.done {
   border-color: var(--green);
-  color: #2b5f47;
+  color: #285e4e;
 }
 .stage.active {
   border-color: var(--accent);
@@ -313,13 +314,13 @@ pre {
 }
 
 .next {
-  background: linear-gradient(120deg, var(--deep) 0%, var(--deep-2) 100%);
+  background: linear-gradient(120deg, #0d2e5c, #1258a8);
   color: #fff;
   border-radius: var(--radius);
   padding: 18px 20px;
 }
 .next .label {
-  color: #a9d5d9;
+  color: #b8d8ff;
 }
 .next h2 {
   color: #fff;
@@ -328,13 +329,13 @@ pre {
   margin: 6px 0;
 }
 .next p {
-  color: #dcecee;
+  color: #eaf3ff;
   font-size: 13px;
 }
 .next .roles {
   margin-top: 8px;
   font-size: 11px;
-  color: #a9d5d9;
+  color: #b8d8ff;
 }
 
 .badge {
@@ -396,12 +397,12 @@ pre {
 }
 
 .note {
-  border: 1px solid #cfe0e3;
-  background: #f1f8f8;
+  border: 1px solid #cbdaf0;
+  background: #f4f8ff;
   border-radius: 6px;
   padding: 10px 12px;
   font-size: 12.5px;
-  color: #2f4f55;
+  color: #435a78;
 }
 .note.warn {
   border-color: #f0d9a8;
@@ -443,12 +444,12 @@ pre {
   border-color: var(--accent);
 }
 .btn.primary:hover {
-  background: #0c5c59;
+  background: #0043a8;
 }
 .btn.secondary {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: #bfdedc;
+  background: #edf4ff;
+  color: #174f9b;
+  border-color: #cbdaf0;
 }
 .btn.warn {
   background: var(--amber-soft);
@@ -557,7 +558,7 @@ pre {
   cursor: pointer;
 }
 .stepcard:hover {
-  border-color: #9fb7c4;
+  border-color: #8eafd8;
 }
 .stepcard.selected {
   border-color: var(--accent);

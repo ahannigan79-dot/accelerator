@@ -1,0 +1,16 @@
+VendorCode,Name,City,GSTIN,PAN,MSME,PaymentTerms,Status,CreatedOn,Notes
+100081,Bharat Steel Traders,Pune,27AABCB1234F1Z5,AABCB1234F,N,Z060,Active,2016-03-12,
+100118,Kirloskar Distributors Pune,Pune,27AAACK5678G1ZQ,AAACK5678G,N,Z030,Active,2016-03-12,OEM authorised dist
+100234,SUNDARAM BEARINGS,Pune,27AADCS9012H1ZK,AADCS9012H,Y,Z045,Active,2017-08-01,MSME cert expired 2022?
+100390,Om Sai Packaging,Chakan,,AAEFO3456J,Y,Z045,Active,2018-01-15,GSTIN missing
+100440,Coimbatore Castings,Coimbatore,33AABCC7890K1Z2,AABCC7890K,N,Z060,Active,2019-11-20,Tally vendor - code mirrored manually
+100517,Precision Gear Works,Pune,27AAFCP2345L1ZR,AAFCP2345L,Y,Z045,Active,2018-05-03,name changed - see 101044
+100612,ACME INDUSTRIAL GASES,Pune,27AACCA6789M1ZP,AACCA6789M,N,Z030,Active,2016-03-12,
+100777,Mahalaxmi Engg Services,Pune,27AAJFM4567N1ZT,,N,Z060,Active,2020-02-10,PAN missing - how was this created
+100821,SAFETY FIRST INDIA,Mumbai,27AABCS8901P1ZV,AABCS8901P,N,Z060,Active,2019-06-30,
+100905,Hitech Hydraulics,Pune,27AAGCH3456Q1ZX,AAGCH3456Q,Y,Z045,Active,2017-04-18,
+100999,ONE TIME VENDOR,,,,N,Z000,Active,2016-03-12,one-time vendor account - used 40+ times in FY25
+101002,TechServe IT Solutions,Pune,27AAKCT7890R1ZZ,AAKCT7890R,N,Z030,Active,2021-09-01,
+101010,Global Valve Components LLC,Houston TX,,,N,Z030,Active,2022-02-14,import vendor USD
+101044,Precision Gears Pune,Pune,27AAFCP2345L1ZR,AAFCP2345L,Y,Z045,Blocked,2025-05-04,duplicate of 100517?? same GSTIN. Finance blocked pending bank verification
+101045,Precision Gears Pune Pvt Ltd,Pune,,,,,Requested,2025-08-12,ProcureEase registration - not in SAP

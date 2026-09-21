@@ -1,0 +1,64 @@
+KRISHNA INDUSTRIES PVT. LTD.
+CORPORATE POLICY — PURCHASING & PROCUREMENT
+Doc ref: KI-PROC-004    Rev: C    Effective: 01-Apr-2021    Owner: Head of Supply Chain (currently vacant — see HR)
+Next review: Apr 2023 (OVERDUE)
+
+*** DRAFT — do not circulate outside Purchase Dept ***   <-- header says draft but this is the version everybody uses. Ravi confirms it was approved in the Apr-21 MRM but nobody updated the header.
+
+1. PURPOSE
+This policy sets out how goods and services are to be procured across all Krishna Industries locations (Pune Works, Coimbatore Plant, Chakan warehouse, Corporate Office Mumbai) to ensure value for money, proper authorisation and audit trail.
+
+2. SCOPE
+Applies to all purchases of raw material, consumables, capital items, services and contract labour. Excludes: payroll, statutory payments, inter-company transfers (see KI-FIN-011), and "petty cash purchases below Rs. 5,000" (see 7.4).
+
+3. DEFINITIONS
+PR = Purchase Requisition (raised in SAP ME51N, or on the paper form KI-F-22 at Coimbatore)
+PO = Purchase Order
+RFQ = Request for Quotation
+DoA = Delegation of Authority (Annexure A)
+MRM = Monthly Review Meeting
+
+4. PROCESS OVERVIEW
+4.1 Requester raises PR with material code, qty, required date, cost centre and justification.
+4.2 PR is released by the Cost Centre owner (SAP release strategy). PRs above Rs 2,00,000 also require HOD release.
+4.3 Purchase Dept converts released PR to RFQ. Minimum THREE quotations required for any purchase above Rs 50,000 (see also 6.2 — single source exceptions).
+4.4 Comparative statement (CS) prepared by Buyer on template KI-F-31 and approved per DoA.
+4.5 PO created in SAP (ME21N) and released per Annexure A release strategy.
+4.6 PO sent to vendor. Vendor acknowledgement to be filed.
+4.7 Goods receipt (MIGO) by Stores against PO. Quality inspection for raw material as per KI-QA-009.
+4.8 Invoice verification (MIRO) by Accounts — 3-way match (PO / GRN / Invoice). Tolerance 2% on qty, 0% on price.
+4.9 Payment as per vendor payment terms (standard 60 days from invoice date; MSME vendors 45 days as per MSMED Act).
+
+5. DELEGATION OF AUTHORITY (summary — full matrix in Annexure A)
+PO value (INR)                Approver
+up to 1,00,000                Purchase Manager
+1,00,001 – 5,00,000           Plant Head / Functional Head
+5,00,001 – 25,00,000          Plant Head + CFO
+above 25,00,000               CFO + MD
+Capital items (any value)     as above PLUS Capex Committee approval (KI-FIN-014)
+
+NOTE: values are per PO. Splitting of POs to avoid approval limits is strictly prohibited (see Internal Audit observation 2019/07).
+
+6. VENDOR MANAGEMENT
+6.1 Only vendors in the Approved Vendor List (AVL) may be issued POs. New vendors to complete KI-F-40 (vendor registration) with GST certificate, PAN, cancelled cheque, MSME certificate if applicable. Vendor Master created by Purchase Dept after Finance verifies bank details.
+6.2 Single-source purchase permitted only where (a) OEM spare, (b) proprietary item, (c) emergency breakdown — in each case Plant Head to sign the single-source justification form KI-F-33.
+6.3 Vendor performance to be reviewed quarterly (this is not currently happening — R.M. note in margin)
+
+7. EXCEPTIONS
+7.1 Emergency / breakdown purchases: Plant Head may authorise verbally; PO to be regularised within 3 working days.
+7.2 Repeat orders against a valid rate contract do not require fresh quotations.
+7.3 Services under Rs 25,000 may be procured on a Work Order instead of PO.
+7.4 Petty cash purchases below Rs 5,000 per transaction, max Rs 25,000 per month per location.
+
+8. RECORDS
+All PR, RFQ, CS, PO, GRN and invoice records to be retained for 8 years. SAP is the system of record for Pune and Mumbai. Coimbatore operates on Tally until SAP rollout (planned FY22-23 — DID NOT HAPPEN, still on Tally as of writing this note - Suresh).
+
+ANNEXURE A — RELEASE STRATEGY (SAP)
+Release group 01 (Pune), 02 (Mumbai). Release codes: PM = Purchase Mgr, PH = Plant Head, FH = Functional Head, CF = CFO, MD = MD.
+[table not reproduced — see SAP config doc from 2019 implementation, file "ZRELEASE_STRAT_v3.xlsx" on shared drive, location unknown]
+
+Revision history
+Rev A  Jan-2016  initial
+Rev B  Jun-2019  DoA limits revised post audit
+Rev C  Apr-2021  MSME payment terms added; Coimbatore paper PR process documented
+(Rev D drafted Feb-2025 by Priya — NOT APPROVED — changes limits to 3L/10L/50L, see email)

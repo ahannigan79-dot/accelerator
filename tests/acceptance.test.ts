@@ -376,3 +376,23 @@ describe("UX / resilience", () => {
     void security;
   });
 });
+
+describe("Sample intake pack", () => {
+  test("Krishna Industries pack ingests with raw content, surfaces the threshold contradiction, and keeps discovery PARTIAL", async () => {
+    const { MemoryStore, setStore } = await import("@/lib/factory/store");
+    const { ingestPack } = await import("@/lib/factory/samples");
+    setStore(new MemoryStore());
+    const r = await ingestPack("samples/krishna-industries", consultant, "ENG-TEST-KI");
+    expect(r.accepted).toHaveLength(10);
+    expect(r.quarantined).toHaveLength(0);
+    expect(r.contradictions.join(" ")).toMatch(/approval_threshold/);
+    expect(r.discovery.BUSINESS.status).toBe("PARTIAL");
+    expect(r.nextHumanAction.actionType).toBe("RESOLVE_CONTRADICTION");
+    const { getStore } = await import("@/lib/factory/store");
+    const rec = await getStore().get("ENG-TEST-KI");
+    expect(rec!.state.evidenceCatalog.every((e) => (e.content?.length ?? 0) > 200)).toBe(true);
+    const m = compileContext(rec!.state, SPECIALISTS.BLUEPRINT, consultant, "t", rec!.state.stateRevision);
+    expect(JSON.stringify(m.body)).toMatch(/Sundaram Bearings/i);
+    setStore(null);
+  });
+});

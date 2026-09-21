@@ -1,0 +1,19 @@
+Krishna Industries — Delegation of Authority — Procurement
+(copied from SharePoint > Finance > Policies > DoA_matrix_2019.xlsx, last modified 2019-07-22 by s.iyer)
+
+                    Purchase Mgr   Plant Head   Func Head   CFO      MD      Capex Comm.
+Raw material PO     <= 1L          <= 5L        -           <= 25L   > 25L   -
+Spares / MRO PO     <= 1L          <= 5L        -           <= 25L   > 25L   -
+Services / WO       <= 50k         <= 5L        <= 5L       <= 25L   > 25L   -
+Capex               -              -            -           <= 25L   > 25L   ALL
+IT (hw/sw/AMC)      -              -            <= 5L*      <= 25L   > 25L   if capex
+Rate contracts      -              <= 50L p.a.  -           > 50L    -       -
+Emergency           verbal OK (Plant Head) — regularise in 3 days
+
+* IT Manager acts as Functional Head for IT purchases
+
+Comments in the xlsx:
+ [s.iyer 2019] "aligned to KI-PROC-004 rev B"
+ [d.sharma 2023-01] "CFO limit should be 50L now, MD travels too much. Not yet approved by board"
+ [p.nair 2025-04] "SEE APRIL MRM - limits changed to 3/10/50, this sheet is OLD"
+ [unknown] "coimbatore??"

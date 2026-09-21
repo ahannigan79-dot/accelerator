@@ -57,7 +57,7 @@ export function ActorPicker() {
   const { actor, setRole } = useActor();
   return (
     <label className="row" style={{ gap: 6, fontSize: 12 }}>
-      <span style={{ color: "#cfe3e6" }}>Acting as</span>
+      <span style={{ color: "#b9ddff" }}>Acting as</span>
       <select value={actor.role} onChange={(e) => setRole(e.target.value as ActorRole)} style={{ borderRadius: 4, border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "#fff", padding: "4px 6px", fontSize: 12 }}>
         {PERSONAS.map((p) => (
           <option key={p.role} value={p.role} style={{ color: "#16202b" }}>

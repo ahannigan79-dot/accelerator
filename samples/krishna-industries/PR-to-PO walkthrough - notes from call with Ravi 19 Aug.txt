@@ -1,0 +1,23 @@
+Call with Ravi Menon (Purchase Manager, Pune) + Anjali (Buyer) — 19/8/25, ~50 min, Teams. Notes by [consultant]. Not verified with Ravi yet.
+
+- ~380 POs/month Pune, ~90 Coimbatore (Coimbatore number is a guess from Ravi, "ask Murugan")
+- PR comes from: SAP (Pune production/maintenance), email (corporate/admin), paper KI-F-22 (Coimbatore), and WhatsApp photo of a handwritten list (Chakan warehouse — "Vijay just sends a photo")
+- Ravi: "honestly 30% of PRs are incomplete, no material code, wrong cost centre, required date = today"
+- Buyers: Anjali (raw material + spares), Rohit (consumables/services), one open position
+- RFQ is done by email. Quotes come back as PDF/email/WhatsApp. Anjali keeps a personal Excel "RFQ tracker 2025.xlsx" — this is the real record, SAP RFQ (ME41) is "never used"
+- Comparative statement: Excel template, printed, signed physically, scanned, attached to PO in SAP as PDF (sometimes) 
+- 3 quotes rule "is followed for anything new but for repeat items we just go with last vendor" — Ravi thinks rate contracts cover this, but there are only 4 rate contracts in SAP and they expired in 2023 (Anjali checked during call)
+- Approval: SAP release strategy. Ravi says the config is from 2019 and "nobody knows how to change it, the Wipro guys left". Actual practice differs (see Priya email)
+- Vendor onboarding: KI-F-40 form, Finance verifies bank via "call back to the number on the letterhead" (!!). Takes 2-6 weeks. So buyers reuse old vendor codes or ask vendor to bill via a sister company already in AVL
+- GRN: Stores does MIGO same day for raw material; for services, GRN is done by the requester "whenever they remember", Accounts chases at month end
+- Invoice: vendor sends to accounts@ mailbox or hands to security gate. ~3 people in AP. MIRO 3-way match fails ~25% of time (Ravi's estimate) mostly because of price differences (freight added on invoice, GST rate different) → parked, manual follow up over email
+- Payment: 60 days standard but "big vendors get 30, MSME supposed to be 45 but we don't track MSME status properly in vendor master, maybe 100 of 900 vendors flagged"
+- Metrics: nobody measures PR-to-PO cycle time. Ravi's gut: 8-12 days normal, 3+ weeks if it goes to CFO. Maintenance complains it is longer.
+- Pain in Ravi's words: "approvals sitting with people who are travelling", "incomplete PRs", "vendor creation takes forever", "AP asking me why invoice doesn't match"
+- What he wants: "an app where I can see all my POs waiting for approval and poke people". Also "AI to read the quotes and make the CS" — but "the CS needs my signature, I'm not letting a computer pick vendors"
+- Systems mentioned: SAP ECC 6 (EHP7?), Tally Prime (Coimbatore), ProcureEase portal (a pilot from 2023 for vendor onboarding — "dead", ~20 vendors registered, IT still pays licence), Outlook, WhatsApp, "the shared drive", DocuSign (used only by Legal)
+- IT contact: Neeraj (IT Manager). SAP support: AMC with some vendor in Pune, Ravi doesn't know name
+- ACTION: get SAP release strategy config export from Neeraj
+- ACTION: get Q1 PO dump (Anjali will send) ← received 21/8, see csv
+- ACTION: confirm with Deepak (CFO office) which DoA is authoritative — rev C or "April MRM"
+- ??? Ravi mentioned a "board approved procurement transformation" from 2024 — nobody has the deck

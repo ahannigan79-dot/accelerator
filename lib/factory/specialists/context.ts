@@ -8,6 +8,8 @@ import { getBaseline, getBlueprint, getBuildContract, getIntegrationContract, ge
 import type { FactoryState } from "../schema";
 import type { ContextSection, SpecialistContract } from "./contracts";
 
+const MAX_CONTENT_PER_RECORD = 16_000;
+
 export type ContextSufficiency = "COMPLETE" | "PARTIAL" | "INSUFFICIENT" | "STALE";
 
 export interface ContextManifest {
@@ -68,7 +70,7 @@ function sectionBody(state: FactoryState, section: ContextSection): unknown {
     case "ENGAGEMENT":
       return { engagementId: state.engagement_id, workflowId: state.workflowId, setup: state.engagementSetup, currentStage: state.currentStage, targetDesignMode: state.targetDesignMode, factoryVersion: state.factoryVersion };
     case "EVIDENCE":
-      return state.evidenceCatalog.filter((e) => e.authorityStatus === "CURRENT").map((e) => ({ evidenceRef: e.evidenceRef, title: e.title, evidenceType: e.evidenceType, sourceClass: e.sourceClass, synthetic: e.synthetic, environment: e.environment, capturedAt: e.capturedAt, scope: e.scope, requirementIds: e.requirementIds, claims: e.claims, summary: e.summary }));
+      return state.evidenceCatalog.filter((e) => e.authorityStatus === "CURRENT").map((e) => ({ evidenceRef: e.evidenceRef, title: e.title, fileName: e.fileName, evidenceType: e.evidenceType, sourceClass: e.sourceClass, synthetic: e.synthetic, environment: e.environment, capturedAt: e.capturedAt, scope: e.scope, requirementIds: e.requirementIds, claims: e.claims, summary: e.summary, content: e.content ? (e.content.length > MAX_CONTENT_PER_RECORD ? `${e.content.slice(0, MAX_CONTENT_PER_RECORD)}\n[... truncated ${e.content.length - MAX_CONTENT_PER_RECORD} chars]` : e.content) : undefined }));
     case "DISCOVERY":
       return { sufficiency: state.discoverySufficiency, requirements: state.evidenceReadinessProfile.requirements.map((r) => ({ requirementId: r.requirementId, description: r.description, requiredByGate: r.requiredByGate, materiality: r.materiality, status: r.status, allowedEvidenceTypes: r.allowedEvidenceTypes })) };
     case "BLUEPRINT": {

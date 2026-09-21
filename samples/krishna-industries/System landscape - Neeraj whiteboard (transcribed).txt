@@ -1,0 +1,23 @@
+Transcribed from photo of whiteboard, IT room, 20 Aug 2025. Drawn by Neeraj (IT Manager). Some boxes unreadable.
+
+[SAP ECC 6.0 EHP7]  <- on-prem, Pune DC. Modules: MM, FI, SD, PP (PP "half used"). Support: AMC with TechServe (PO 118226). Basis by TechServe. No dev access in-house.
+   |-- ME51N PR, ME21N PO, ME29N release (release strategy config 2019 - "Wipro"), MIGO, MIRO
+   |-- Vendor master (XK01) - created by Purchase, bank fields by Finance
+   |-- No RFQ usage (ME41 unused)
+   |-- Attachments: GOS (generic object services) - PDFs of CS and WhatsApp screenshots(!)
+   |-- Interfaces: NONE to Tally. Bank file export (HDFC H2H) for payments. That's it.
+   |-- SAP is 'end of maintenance 2027' - S/4 migration "being discussed" 
+[Tally Prime] Coimbatore. Standalone. Kumar's laptop + one desktop. Backup = USB drive. Month-end: Murugan sends Excel to Pune finance, they post a JV in SAP.
+[ProcureEase] SaaS vendor portal, pilot 2023. ~20 vendors registered. No integration to SAP - was supposed to push vendor master via "API" (CSV email??). Licence Rs 4.8L/yr. Neeraj: "kill it or use it".
+[Outlook/M365] all RFQ traffic. accounts@ shared mailbox for invoices. SharePoint has policies + "shared drive" (actually a file server, \\KIFS01\purchase).
+[WhatsApp] approvals, PR photos from Chakan. Not sanctioned. Everyone uses it.
+[DocuSign] Legal only, 5 licences.
+[Excel] "RFQ tracker 2025.xlsx" (Anjali, local), CS template KI-F-31, vendor perf sheet (nobody updates).
+[??? box] something like "MES / SCADA" arrow to SAP PP - Neeraj says "ignore, that's production"
+[Bank] HDFC host-to-host for payment file. Manual upload by Finance twice a week.
+
+Security/identity: AD on-prem, M365 synced. SAP users = separate. No SSO. Shared SAP login "PURCHASE2" exists (used by temps).
+Logging/monitoring: "SAP has logs". Nothing central. No SIEM. TechServe does monthly health check PDF.
+Data: no data warehouse. Reporting = SAP standard reports exported to Excel.
+
+Neeraj's ask: "whatever you build must not need SAP dev work, we can't get transports approved in less than 2 months. Read via RFC/ODBC is ok, TechServe can set it up."
