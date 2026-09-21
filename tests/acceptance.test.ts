@@ -393,6 +393,15 @@ describe("Sample intake pack", () => {
     expect(rec!.state.evidenceCatalog.every((e) => (e.content?.length ?? 0) > 200)).toBe(true);
     const m = compileContext(rec!.state, SPECIALISTS.BLUEPRINT, consultant, "t", rec!.state.stateRevision);
     expect(JSON.stringify(m.body)).toMatch(/Sundaram Bearings/i);
+    // Resolving each contradiction by decision (without superseding records) reconciles the claims.
+    let st = rec!.state;
+    for (const c of [...st.discoverySufficiency.contradictions]) {
+      st = act(st, owner, "RESOLVE_CONTRADICTION", { contradictionId: c.contradictionId, resolution: "Policy value stands until Rev D is approved." }).state;
+    }
+    expect(st.discoverySufficiency.contradictions.every((c) => c.status === "RESOLVED")).toBe(true);
+    expect(st.evidenceReadinessProfile.requirements.find((r) => r.requirementId === "EVID-001")?.status).toBe("SUFFICIENT");
+    expect(st.discoverySufficiency.layers.BUSINESS.status).toBe("SUFFICIENT");
+    expectError(() => act(st, owner, "RESOLVE_CONTRADICTION", { contradictionId: "CON-001", resolution: "again" }), "PRECONDITION_FAILED", /already resolved/);
     setStore(null);
   });
 });

@@ -19,7 +19,10 @@ export function EvidenceForms({ requirements, contradictions }: { requirements: 
     if (out.length === 1) setF({ ...f, title: f.title || out[0].fileName.replace(/\.[a-z0-9]+$/i, ""), fileName: out[0].fileName, content: out[0].content, evidenceType: guessType(out[0].fileName) });
     else setBatch(out);
   }
-  const [res, setRes] = useState<{ contradictionId: string; resolution: string; supersede: string }>({ contradictionId: contradictions[0]?.contradictionId ?? "", resolution: "", supersede: "" });
+  const [res, setRes] = useState<{ contradictionId: string; resolution: string; supersede: string }>({ contradictionId: "", resolution: "", supersede: "" });
+  // The list of open contradictions changes after each resolution while this client component keeps its state,
+  // so always resolve the selection against the current list.
+  const selectedContradiction = contradictions.find((c) => c.contradictionId === res.contradictionId) ?? contradictions[0];
   const claims = f.claims
     .split(/[\n,]+/)
     .map((x) => x.trim())
@@ -123,7 +126,7 @@ export function EvidenceForms({ requirements, contradictions }: { requirements: 
       {contradictions.length ? (
         <Panel label="Resolve a contradiction">
           <div className="stack" style={{ gap: 8 }}>
-            <select value={res.contradictionId} onChange={(e) => setRes({ ...res, contradictionId: e.target.value })} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 6 }}>
+            <select value={selectedContradiction?.contradictionId ?? ""} onChange={(e) => setRes({ ...res, contradictionId: e.target.value })} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 6 }}>
               {contradictions.map((c) => (
                 <option key={c.contradictionId} value={c.contradictionId}>
                   {c.contradictionId} · {c.description}
@@ -133,9 +136,10 @@ export function EvidenceForms({ requirements, contradictions }: { requirements: 
             <input placeholder="Resolution (recorded as a human decision)" value={res.resolution} onChange={(e) => setRes({ ...res, resolution: e.target.value })} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 6 }} />
             <input placeholder="Supersede evidence refs (comma separated, optional)" value={res.supersede} onChange={(e) => setRes({ ...res, supersede: e.target.value })} style={{ border: "1px solid var(--line)", borderRadius: 4, padding: 6 }} />
             <div>
-              <ActionButton actionType="RESOLVE_CONTRADICTION" variant="primary" disabled={!res.resolution.trim()} payload={{ contradictionId: res.contradictionId, resolution: res.resolution, supersedeEvidenceRefs: res.supersede.split(",").map((x) => x.trim()).filter(Boolean) }}>
+              <ActionButton actionType="RESOLVE_CONTRADICTION" variant="primary" disabled={!selectedContradiction || !res.resolution.trim()} payload={{ contradictionId: selectedContradiction?.contradictionId, resolution: res.resolution, supersedeEvidenceRefs: res.supersede.split(",").map((x) => x.trim()).filter(Boolean) }} onDone={(r) => r.ok && setRes({ contradictionId: "", resolution: "", supersede: "" })}>
                 Resolve
               </ActionButton>
+              <span className="small muted" style={{ marginLeft: 8 }}>Involved: {selectedContradiction?.evidenceRefs.join(", ")}. Superseding the losing record retires its claim; otherwise the resolution decision itself reconciles the conflict.</span>
             </div>
           </div>
         </Panel>

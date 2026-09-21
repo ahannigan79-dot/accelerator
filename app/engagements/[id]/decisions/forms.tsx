@@ -65,10 +65,12 @@ export function PendingDecisionForm({ request }: { request: PendingHumanDecision
 export function DecisionForms({ requirements, openItems, currentStage, targetDesignMode }: { requirements: { requirementId: string; description: string; status: string; waiverAuthority: ActorRole[] }[]; openItems: { itemId: string; title: string }[]; currentStage: string; targetDesignMode: TargetDesignMode }) {
   const { actor } = useActor();
   const { run } = useAction();
-  const [reqId, setReqId] = useState(requirements[0]?.requirementId ?? "");
+  const [reqIdState, setReqId] = useState("");
+  const reqId = requirements.some((r) => r.requirementId === reqIdState) ? reqIdState : requirements[0]?.requirementId ?? "";
   const [waiverReason, setWaiverReason] = useState("");
   const [expires, setExpires] = useState(() => new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10));
-  const [itemId, setItemId] = useState(openItems[0]?.itemId ?? "");
+  const [itemIdState, setItemId] = useState("");
+  const itemId = openItems.some((o) => o.itemId === itemIdState) ? itemIdState : openItems[0]?.itemId ?? "";
   const [answer, setAnswer] = useState("");
   const [mode, setMode] = useState<TargetDesignMode>("AI_NATIVE_REIMAGINED");
   const [pathReason, setPathReason] = useState("");

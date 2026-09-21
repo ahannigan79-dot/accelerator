@@ -81,7 +81,8 @@ export function assessRequirement(state: FactoryState, req: EvidenceRequirement,
     if (relevant.length) return { status: "REQUIRED", detail: `${relevant.length} record(s) attached but none admissible` };
     return { status: "REQUIRED", detail: "No evidence recorded" };
   }
-  const contradictions = contradictingClaims(admissible);
+  const resolved = state.discoverySufficiency.contradictions.filter((c) => c.status === "RESOLVED");
+  const contradictions = contradictingClaims(admissible).filter((c) => !resolved.some((r) => r.topic === c.key && c.evidenceRefs.every((ref) => r.evidenceRefs.includes(ref))));
   if (contradictions.length) return { status: "PARTIAL", detail: `Contradictory claims on ${contradictions.map((c) => c.key).join(", ")} — reconcile before this counts` };
   if (admissible.length < req.minimumEvidenceCount) return { status: "PARTIAL", detail: `${admissible.length} of ${req.minimumEvidenceCount} required admissible record(s)` };
   const claimKeys = new Set(admissible.flatMap((r) => r.claims.map((c) => c.key)));
