@@ -80,14 +80,16 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
   }
   await runAction(engagementId, { actionType: "START_JOB", actor, payload: { jobId } });
   // Long structured outputs can take several minutes; keep the SDK timeout under the route limit so a slow run fails as a job, not a 504.
-  const anthropic = client ?? new Anthropic({ timeout: 12 * 60 * 1000, maxRetries: 1 });
+  const anthropic = client ?? new Anthropic({ maxRetries: 1 });
   const started = Date.now();
   try {
     // The SDK helper runs on the Zod v4 runtime but its type declarations reference the v3 ZodType, so the cast bridges the two.
-    const schema = contract.outputSchema as unknown as Parameters<typeof zodOutputFormat>[0];
-    const response = await anthropic.messages.parse({
+    const schema = contract.outputSchema;
+    const format = zodOutputFormat(schema as unknown as Parameters<typeof zodOutputFormat>[0]);
+    // Streaming: long structured outputs can run for many minutes, and the SDK rejects non-streaming requests that could exceed ten.
+    const stream = anthropic.messages.stream({
       model: process.env.FACTORY_MODEL || DEFAULT_MODEL,
-      max_tokens: 32000,
+      max_tokens: 64000,
       system: [
         { type: "text", text: contract.systemPrompt, cache_control: { type: "ephemeral" } },
         { type: "text", text: `Must not: ${contract.mustNot.join("; ")}.` },
@@ -98,8 +100,9 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
           content: `Context Manifest ${manifest.manifestId} (state revision ${manifest.stateRevision}, sufficiency ${manifest.sufficiency}).\nSections: ${manifest.sectionsIncluded.join(", ")}.\nExclusions: ${manifest.exclusions.join("; ")}.\n\n${JSON.stringify(manifest.body)}\n\nTask: ${task === "DEFAULT" ? contract.objective : task}. Respond with the structured output only.`,
         },
       ],
-      output_config: { format: zodOutputFormat(schema) },
+      output_config: { format: { type: format.type, schema: format.schema } },
     });
+    const response = await stream.finalMessage();
     telemetry.modelCalls = 1;
     telemetry.inputTokens = response.usage.input_tokens;
     telemetry.outputTokens = response.usage.output_tokens;
@@ -107,8 +110,13 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
     telemetry.latencyMs = Date.now() - started;
     if (response.stop_reason === "refusal") throw new Error(`Model declined the task${response.stop_details?.explanation ? `: ${response.stop_details.explanation}` : ""}`);
     if (response.stop_reason === "max_tokens") throw new Error("Model output truncated (max_tokens)");
-    const parsed = response.parsed_output as Record<string, unknown> | null;
-    if (!parsed) throw new Error("Model output did not match the specialist schema");
+    const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = schema.parse(JSON.parse(text)) as Record<string, unknown>;
+    } catch (e) {
+      throw new Error(`Model output did not match the specialist schema: ${e instanceof Error ? e.message.slice(0, 300) : String(e)}`);
+    }
     const rec = toRecommendation(contract, parsed, state);
     const done = await runAction(engagementId, { actionType: "COMPLETE_JOB", actor, payload: { jobId, telemetry, recommendation: { ...rec, source: "AI_SPECIALIST", specialistId, producedAt: new Date().toISOString(), sourceStateRevision: manifest.stateRevision } } });
     return { jobId, status: "COMPLETE", manifest, requestId: done.data?.requestId as string | undefined, recommendationRef: done.data?.recommendationRef as string | undefined, telemetry };

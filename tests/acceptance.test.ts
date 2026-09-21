@@ -439,7 +439,7 @@ describe("Specialist run (stubbed model)", () => {
       openItems: [{ title: "Which DoA is authoritative", detail: "Rev C vs April MRM", owner: "CFO office", relatedIds: ["WF-003"] }],
       contradictionsNoted: ["approval thresholds"],
     };
-    const stub = { messages: { parse: async () => ({ stop_reason: "end_turn", usage: { input_tokens: 12000, output_tokens: 3000, cache_read_input_tokens: 0 }, parsed_output }) } } as unknown as import("@anthropic-ai/sdk").default;
+    const stub = { messages: { stream: () => ({ finalMessage: async () => ({ stop_reason: "end_turn", usage: { input_tokens: 12000, output_tokens: 3000, cache_read_input_tokens: 0 }, content: [{ type: "text", text: JSON.stringify(parsed_output) }] }) }) } } as unknown as import("@anthropic-ai/sdk").default;
     const r = await runSpecialist("ENG-TEST-KI2", "BLUEPRINT", consultant, "DEFAULT", stub);
     expect(r.status).toBe("COMPLETE");
     expect(r.requestId).toMatch(/^REQ-/);
