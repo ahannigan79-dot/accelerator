@@ -5,7 +5,8 @@ import { SPECIALIST_IDS, type SpecialistId } from "@/lib/factory/specialists/con
 import { runSpecialist } from "@/lib/factory/specialists/runner";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+// Pro plan maximum with Fluid Compute. A long Blueprint run can exceed five minutes.
+export const maxDuration = 800;
 
 /** Run a stateless AI specialist as a governed job. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

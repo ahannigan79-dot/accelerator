@@ -79,7 +79,8 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
     return { jobId, status: "FAILED", manifest, error: "AI worker unavailable", telemetry };
   }
   await runAction(engagementId, { actionType: "START_JOB", actor, payload: { jobId } });
-  const anthropic = client ?? new Anthropic();
+  // Long structured outputs can take several minutes; keep the SDK timeout under the route limit so a slow run fails as a job, not a 504.
+  const anthropic = client ?? new Anthropic({ timeout: 12 * 60 * 1000, maxRetries: 1 });
   const started = Date.now();
   try {
     // The SDK helper runs on the Zod v4 runtime but its type declarations reference the v3 ZodType, so the cast bridges the two.
