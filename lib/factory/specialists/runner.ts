@@ -13,6 +13,17 @@ import { compileContext, type ContextManifest } from "./context";
 import { EVIDENCE_INTAKE_CONTRACT, SPECIALISTS, type SpecialistContract, type SpecialistId } from "./contracts";
 
 export const DEFAULT_MODEL = "claude-opus-5";
+/** Schemas larger than this are sent in the prompt instead of compiled into a decoding grammar. */
+export const MAX_GRAMMAR_SCHEMA_CHARS = 3500;
+
+/** Tolerate a code fence or stray prose around the JSON object. */
+export function extractJson(text: string): string {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  const body = fenced ? fenced[1] : text;
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  return start >= 0 && end > start ? body.slice(start, end + 1) : body;
+}
 
 export function aiAvailable(): boolean {
   return !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
@@ -86,37 +97,43 @@ export async function runSpecialist(engagementId: string, specialistId: Speciali
     // The SDK helper runs on the Zod v4 runtime but its type declarations reference the v3 ZodType, so the cast bridges the two.
     const schema = contract.outputSchema;
     const format = zodOutputFormat(schema as unknown as Parameters<typeof zodOutputFormat>[0]);
-    // Streaming: long structured outputs can run for many minutes, and the SDK rejects non-streaming requests that could exceed ten.
-    const stream = anthropic.messages.stream({
-      model: process.env.FACTORY_MODEL || DEFAULT_MODEL,
-      max_tokens: 64000,
-      system: [
-        { type: "text", text: contract.systemPrompt, cache_control: { type: "ephemeral" } },
-        { type: "text", text: `Must not: ${contract.mustNot.join("; ")}.` },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: `Context Manifest ${manifest.manifestId} (state revision ${manifest.stateRevision}, sufficiency ${manifest.sufficiency}).\nSections: ${manifest.sectionsIncluded.join(", ")}.\nExclusions: ${manifest.exclusions.join("; ")}.\n\n${JSON.stringify(manifest.body)}\n\nTask: ${task === "DEFAULT" ? contract.objective : task}. Respond with the structured output only.`,
-        },
-      ],
-      output_config: { format: { type: format.type, schema: format.schema } },
-    });
-    const response = await stream.finalMessage();
-    telemetry.modelCalls = 1;
-    telemetry.inputTokens = response.usage.input_tokens;
-    telemetry.outputTokens = response.usage.output_tokens;
-    telemetry.cacheReadTokens = response.usage.cache_read_input_tokens ?? 0;
-    telemetry.latencyMs = Date.now() - started;
-    if (response.stop_reason === "refusal") throw new Error(`Model declined the task${response.stop_details?.explanation ? `: ${response.stop_details.explanation}` : ""}`);
-    if (response.stop_reason === "max_tokens") throw new Error("Model output truncated (max_tokens)");
-    const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = schema.parse(JSON.parse(text)) as Record<string, unknown>;
-    } catch (e) {
-      throw new Error(`Model output did not match the specialist schema: ${e instanceof Error ? e.message.slice(0, 300) : String(e)}`);
+    const schemaJson = JSON.stringify(format.schema);
+    // Constrained decoding compiles the schema into a grammar; the API rejects large ones. Above the threshold the schema
+    // travels in the prompt instead and the output is validated locally, with one repair round on validation failure.
+    const constrained = schemaJson.length <= MAX_GRAMMAR_SCHEMA_CHARS;
+    const userText = `Context Manifest ${manifest.manifestId} (state revision ${manifest.stateRevision}, sufficiency ${manifest.sufficiency}).\nSections: ${manifest.sectionsIncluded.join(", ")}.\nExclusions: ${manifest.exclusions.join("; ")}.\n\n${JSON.stringify(manifest.body)}\n\nTask: ${task === "DEFAULT" ? contract.objective : task}.${constrained ? " Respond with the structured output only." : `\n\nRespond with a single JSON object and nothing else (no prose, no code fence) that conforms exactly to this JSON Schema:\n${schemaJson}`}`;
+    const messages: Anthropic.MessageParam[] = [{ role: "user", content: userText }];
+    let parsed: Record<string, unknown> | null = null;
+    let lastError = "";
+    for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+      const stream = anthropic.messages.stream({
+        model: process.env.FACTORY_MODEL || DEFAULT_MODEL,
+        max_tokens: 64000,
+        system: [
+          { type: "text", text: contract.systemPrompt, cache_control: { type: "ephemeral" } },
+          { type: "text", text: `Must not: ${contract.mustNot.join("; ")}.` },
+        ],
+        messages,
+        ...(constrained ? { output_config: { format: { type: format.type, schema: format.schema } } } : {}),
+      });
+      const response = await stream.finalMessage();
+      telemetry.modelCalls += 1;
+      telemetry.inputTokens += response.usage.input_tokens;
+      telemetry.outputTokens += response.usage.output_tokens;
+      telemetry.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
+      telemetry.latencyMs = Date.now() - started;
+      if (response.stop_reason === "refusal") throw new Error(`Model declined the task${response.stop_details?.explanation ? `: ${response.stop_details.explanation}` : ""}`);
+      if (response.stop_reason === "max_tokens") throw new Error("Model output truncated (max_tokens)");
+      const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+      try {
+        parsed = schema.parse(JSON.parse(extractJson(text))) as Record<string, unknown>;
+      } catch (e) {
+        lastError = e instanceof Error ? e.message.slice(0, 1500) : String(e);
+        telemetry.retries += 1;
+        messages.push({ role: "assistant", content: response.content }, { role: "user", content: `That output failed validation against the schema:\n${lastError}\n\nReturn the corrected JSON object only.` });
+      }
     }
+    if (!parsed) throw new Error(`Model output did not match the specialist schema after repair: ${lastError.slice(0, 300)}`);
     const rec = toRecommendation(contract, parsed, state);
     const done = await runAction(engagementId, { actionType: "COMPLETE_JOB", actor, payload: { jobId, telemetry, recommendation: { ...rec, source: "AI_SPECIALIST", specialistId, producedAt: new Date().toISOString(), sourceStateRevision: manifest.stateRevision } } });
     return { jobId, status: "COMPLETE", manifest, requestId: done.data?.requestId as string | undefined, recommendationRef: done.data?.recommendationRef as string | undefined, telemetry };

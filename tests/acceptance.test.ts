@@ -407,6 +407,15 @@ describe("Sample intake pack", () => {
 });
 
 describe("Specialist output schemas", () => {
+  test("small schemas use constrained decoding; the Blueprint schema is sent in the prompt", async () => {
+    const { zodOutputFormat } = await import("@anthropic-ai/sdk/helpers/zod");
+    const { MAX_GRAMMAR_SCHEMA_CHARS, extractJson } = await import("@/lib/factory/specialists/runner");
+    const size = (id: keyof typeof SPECIALISTS) => JSON.stringify(zodOutputFormat(SPECIALISTS[id].outputSchema as never).schema).length;
+    expect(size("BLUEPRINT")).toBeGreaterThan(MAX_GRAMMAR_SCHEMA_CHARS);
+    expect(size("CODE_VALIDATOR")).toBeLessThanOrEqual(MAX_GRAMMAR_SCHEMA_CHARS);
+    expect(extractJson("Here you go:\n```json\n{\"a\":1}\n```\nthanks")).toBe("{\"a\":1}");
+    expect(extractJson("{\"a\":{\"b\":2}}")).toBe("{\"a\":{\"b\":2}}");
+  });
   test("every AI specialist schema compiles to a structured-output format with the SDK helper", async () => {
     const { zodOutputFormat } = await import("@anthropic-ai/sdk/helpers/zod");
     const { EVIDENCE_INTAKE_CONTRACT } = await import("@/lib/factory/specialists/contracts");
@@ -439,9 +448,19 @@ describe("Specialist run (stubbed model)", () => {
       openItems: [{ title: "Which DoA is authoritative", detail: "Rev C vs April MRM", owner: "CFO office", relatedIds: ["WF-003"] }],
       contradictionsNoted: ["approval thresholds"],
     };
-    const stub = { messages: { stream: () => ({ finalMessage: async () => ({ stop_reason: "end_turn", usage: { input_tokens: 12000, output_tokens: 3000, cache_read_input_tokens: 0 }, content: [{ type: "text", text: JSON.stringify(parsed_output) }] }) }) } } as unknown as import("@anthropic-ai/sdk").default;
+    let calls = 0;
+    const stub = { messages: { stream: (req: { output_config?: unknown; messages: unknown[] }) => ({ finalMessage: async () => {
+      calls++;
+      // Blueprint schema is above the grammar threshold → schema must travel in the prompt, not as output_config.
+      expect(req.output_config).toBeUndefined();
+      expect(JSON.stringify(req.messages[0])).toMatch(/JSON Schema/);
+      const text = calls === 1 ? "```json\n" + JSON.stringify({ ...parsed_output, confidence: "VERY" }) + "\n```" : JSON.stringify(parsed_output);
+      return { stop_reason: "end_turn", usage: { input_tokens: 12000, output_tokens: 3000, cache_read_input_tokens: 0 }, content: [{ type: "text", text }] };
+    } }) } } as unknown as import("@anthropic-ai/sdk").default;
     const r = await runSpecialist("ENG-TEST-KI2", "BLUEPRINT", consultant, "DEFAULT", stub);
     expect(r.status).toBe("COMPLETE");
+    expect(calls).toBe(2);
+    expect(r.telemetry.retries).toBe(1);
     expect(r.requestId).toMatch(/^REQ-/);
     let rec = (await getStore().get("ENG-TEST-KI2"))!;
     const pending = rec.state.pendingHumanDecisions.find((p) => p.requestId === r.requestId)!;
