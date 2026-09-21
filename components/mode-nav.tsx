@@ -17,20 +17,28 @@ const MODES: [string, string][] = [
   ["/lineage", "Lineage"],
 ];
 
-export function ModeNav({ id }: { id: string }) {
+/**
+ * Horizontal axis: working surfaces over the same authoritative state. Users move freely between them.
+ * The stage rail (vertical) is not navigation; it advances only through governed actions.
+ */
+export function ModeNav({ id, nextRoute, nextTitle }: { id: string; nextRoute?: string; nextTitle?: string }) {
   const path = usePathname();
   const base = `/engagements/${id}`;
   return (
     <nav className="modebar">
+      <span className="axis-label">Work in</span>
       {MODES.map(([suffix, label]) => {
         const href = `${base}${suffix}`;
         const active = suffix === "" ? path === base : path.startsWith(href);
+        const isNext = !!nextRoute && (suffix === "" ? nextRoute === base : nextRoute.startsWith(href));
         return (
-          <Link key={suffix} href={href} className={active ? "active" : ""}>
+          <Link key={suffix} href={href} className={`${active ? "active" : ""}${isNext ? " next" : ""}`} title={isNext ? `Next action: ${nextTitle ?? ""}` : undefined}>
             {label}
+            {isNext ? <span className="next-dot" aria-label="next action here" /> : null}
           </Link>
         );
       })}
+      {nextRoute ? <span className="axis-hint">● marks where the next action is</span> : null}
     </nav>
   );
 }

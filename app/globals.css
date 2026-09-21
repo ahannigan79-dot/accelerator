@@ -179,6 +179,32 @@ pre {
   color: #fff;
   border-color: var(--accent);
 }
+.modebar a.next {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px var(--amber-soft);
+}
+.next-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.axis-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+  margin-right: 4px;
+}
+.axis-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
 .shell {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);

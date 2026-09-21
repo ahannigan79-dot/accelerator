@@ -38,10 +38,11 @@ export default async function EngagementLayout({ children, params }: { children:
             <ActorPicker />
           </div>
         </header>
-        <ModeNav id={id} />
+        <ModeNav id={id} nextRoute={runtime.nextHumanAction.route} nextTitle={runtime.nextHumanAction.title} />
         <div className="shell">
           <aside className="rail">
             <h3>Engagement journey</h3>
+            <p className="small muted" style={{ margin: "0 0 8px" }}>Where the engagement is. Stages advance only through governed actions (gates and human decisions), not by clicking.</p>
             {LIFECYCLE_STAGES.map((s, i) => (
               <div key={s} className={`stage${i < cur ? " done" : i === cur ? " active" : ""}`}>
                 {i + 1} · {STAGE_LABELS[s]}
